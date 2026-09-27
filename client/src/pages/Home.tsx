@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { MapView } from "@/components/Map";
 import {
   ArrowDownUp,
   ArrowRight,
@@ -35,6 +36,8 @@ type Listing = {
   name: string;
   district: string;
   cluster: string;
+  lat: number;
+  lng: number;
   price: number;
   area: number;
   floor: string;
@@ -54,6 +57,8 @@ const listings: Listing[] = [
     name: "광장힐스테이트",
     district: "광진구 광장동",
     cluster: "한강권",
+    lat: 37.5479,
+    lng: 127.1037,
     price: 79500,
     area: 59,
     floor: "10/18층",
@@ -71,6 +76,8 @@ const listings: Listing[] = [
     name: "수색자이",
     district: "은평구 수색동",
     cluster: "서북권",
+    lat: 37.5814,
+    lng: 126.8958,
     price: 74200,
     area: 59,
     floor: "15/22층",
@@ -88,6 +95,8 @@ const listings: Listing[] = [
     name: "강동리엔파크",
     district: "강동구 상일동",
     cluster: "동남권",
+    lat: 37.5502,
+    lng: 127.1631,
     price: 77800,
     area: 59,
     floor: "7/20층",
@@ -105,6 +114,8 @@ const listings: Listing[] = [
     name: "구로두산위브",
     district: "구로구 구로동",
     cluster: "서남권",
+    lat: 37.4954,
+    lng: 126.8874,
     price: 68800,
     area: 59,
     floor: "8/15층",
@@ -122,6 +133,8 @@ const listings: Listing[] = [
     name: "신내데시앙",
     district: "중랑구 신내동",
     cluster: "북부권",
+    lat: 37.6126,
+    lng: 127.1045,
     price: 64900,
     area: 59,
     floor: "12/18층",
@@ -139,6 +152,8 @@ const listings: Listing[] = [
     name: "개봉한진타운",
     district: "구로구 개봉동",
     cluster: "서남권",
+    lat: 37.4947,
+    lng: 126.8581,
     price: 60300,
     area: 49,
     floor: "5/15층",
@@ -156,6 +171,8 @@ const listings: Listing[] = [
     name: "상계주공 5단지",
     district: "노원구 상계동",
     cluster: "북부권",
+    lat: 37.6542,
+    lng: 127.0612,
     price: 57800,
     area: 49,
     floor: "4/15층",
@@ -173,6 +190,8 @@ const listings: Listing[] = [
     name: "반포래미안퍼스티지",
     district: "서초구 반포동",
     cluster: "강남권",
+    lat: 37.5048,
+    lng: 126.9945,
     price: 198000,
     area: 59,
     floor: "11/28층",
@@ -320,6 +339,81 @@ function ListingCard({
   );
 }
 
+function MapPanel({
+  listings: visibleListings,
+  budgetTotal,
+  selectedIds,
+  onSelect,
+}: {
+  listings: Listing[];
+  budgetTotal: number;
+  selectedIds: string[];
+  onSelect: (id: string) => void;
+}) {
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+
+  const drawMarkers = (map: google.maps.Map) => {
+    markersRef.current.forEach((marker) => { marker.map = null; });
+    markersRef.current = [];
+    if (!window.google?.maps?.marker) return;
+
+    const bounds = new window.google.maps.LatLngBounds();
+    visibleListings.forEach((listing) => {
+      const markerContent = document.createElement("button");
+      markerContent.className = `map-price-marker ${selectedIds.includes(listing.id) ? "is-selected" : ""}`;
+      markerContent.type = "button";
+      markerContent.innerHTML = `<strong>${formatPrice(listing.price)}</strong><span>${listing.name}</span>`;
+      markerContent.setAttribute("aria-label", `${listing.name} ${formatPrice(listing.price)} 비교 추가`);
+      markerContent.addEventListener("click", () => onSelect(listing.id));
+
+      const marker = new window.google.maps.marker.AdvancedMarkerElement({
+        map,
+        position: { lat: listing.lat, lng: listing.lng },
+        title: `${listing.name} · ${formatPrice(listing.price)}`,
+        content: markerContent,
+      });
+      markersRef.current.push(marker);
+      bounds.extend({ lat: listing.lat, lng: listing.lng });
+    });
+
+    if (visibleListings.length > 0) {
+      map.fitBounds(bounds, 56);
+      if (visibleListings.length === 1) map.setZoom(14);
+    }
+  };
+
+  useEffect(() => () => {
+    markersRef.current.forEach((marker) => { marker.map = null; });
+  }, []);
+
+  return (
+    <div className="map-panel">
+      <div className="map-panel-header">
+        <div>
+          <span className="mini-label">SEOUL / LOCATION VIEW</span>
+          <h3>가격과 위치를 같이 보세요.</h3>
+        </div>
+        <div className="map-panel-meta"><span className="live-dot" /> {visibleListings.length}개 표시 중</div>
+      </div>
+      <div className="map-stage">
+        <MapView
+          key={visibleListings.map((listing) => listing.id).join("-") || "empty"}
+          className="listing-map"
+          initialCenter={{ lat: 37.552, lng: 126.99 }}
+          initialZoom={11}
+          onMapReady={(map) => {
+            mapRef.current = map;
+            drawMarkers(map);
+          }}
+        />
+        <div className="map-source-note"><CircleDollarSign size={14} /><span>매매가 {formatPrice(budgetTotal)} 이하 · 현재 필터 결과</span></div>
+        <div className="map-legend"><span><i className="legend-dot fit" /> 예산 안</span><span><i className="legend-dot selected" /> 비교 선택</span><span><MapPin size={12} /> 마커를 눌러 비교에 추가</span></div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [savings, setSavings] = useState(24000);
   const [monthly, setMonthly] = useState(380);
@@ -404,7 +498,7 @@ export default function Home() {
             <p className="hero-description">대출 상환액과 보유 자금을 입력하면<br className="desktop-only" /> 지금 살펴볼 수 있는 아파트를 한눈에 보여드려요.</p>
             <div className="hero-trust-row">
               <span><ShieldCheck size={15} /> 내 정보는 브라우저에만 저장돼요</span>
-              <span><Sparkles size={15} /> 8개 샘플 매물로 시작</span>
+              <span><Sparkles size={15} /> 실거래 API 연동 준비</span>
             </div>
           </div>
 
@@ -483,6 +577,19 @@ export default function Home() {
             <button className={`fit-toggle ${onlyFit ? "is-on" : ""}`} onClick={() => setOnlyFit((current) => !current)}><span className="toggle-dot" /> 예산 안에만</button>
             <label className="sort-control"><ArrowDownUp size={15} /><select value={sort} onChange={(event) => setSort(event.target.value)}><option>추천순</option><option>낮은 가격순</option><option>넓은 평형순</option></select><ChevronDown size={14} /></label>
           </div>
+
+          <div className="data-source-banner">
+            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>현재는 화면 검증용 샘플 매물이에요.</strong><span>국토교통부 실거래 API를 연결하면 서울 구·월별 거래를 이 지도와 목록에 자동으로 채울 수 있어요.</span></div></div>
+            <span className="api-ready-pill"><BadgeCheck size={14} /> API 연결 구조 준비</span>
+          </div>
+
+          <MapPanel
+            key={`${cluster}-${area}-${priceLimit}-${onlyFit}-${sort}-${filteredListings.map((listing) => listing.id).join("-")}`}
+            listings={filteredListings}
+            budgetTotal={budget.total}
+            selectedIds={selectedIds}
+            onSelect={toggleCompare}
+          />
 
           <div className="listings-content">
             <div className="listings-summary"><span><strong>{filteredListings.length}</strong> RESULTS</span><span className="summary-line" /><span>매매 / 서울 / {formatPrice(Math.min(priceLimit, budget.total))} 이하</span></div>
