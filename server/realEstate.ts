@@ -98,14 +98,16 @@ export async function fetchMolitAptTrades({ lawdCd, dealYmd, numOfRows = 100, di
 }
 
 export type PropertyTypeFilter = "all" | "apartment" | "villa";
-const regionCache = new Map<string, { expiresAt: number; data: MolitAptTrade[]; month: string; region: RegionKey; propertyType: PropertyTypeFilter; periodYears: number; sourceWarning?: string; requestFailures: number }>();
+const regionCache = new Map<string, { expiresAt: number; data: MolitAptTrade[]; month: string; region: RegionKey; propertyType: PropertyTypeFilter; periodYears: number; sourceWarning?: string; requestFailures: number; failureReason?: string }>();
 export async function fetchRecentAptTrades({ region = "seoul", months = 1, perDistrict = 20, limit = 240, propertyType = "all", periodYears = 1, includeTrend = false }: { region?: RegionKey; months?: number; perDistrict?: number; limit?: number; propertyType?: PropertyTypeFilter; periodYears?: 1 | 3 | 5 | 10; includeTrend?: boolean } = {}) {
   const cacheKey = `v4:${region}:${propertyType}:${periodYears}:${months}:${perDistrict}:${limit}:${includeTrend}`; const cached = regionCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) return cached;
-  const districts = REGION_DISTRICTS[region]; const types = propertyType === "all" ? ["apartment", "villa"] as const : [propertyType]; let data: MolitAptTrade[] = []; let latestMonth = getSeoulTradeMonth(new Date(), 1); let requestFailures = 0;
+  const districts = REGION_DISTRICTS[region]; const types = propertyType === "all" ? ["apartment", "villa"] as const : [propertyType]; let data: MolitAptTrade[] = []; let latestMonth = getSeoulTradeMonth(new Date(), 1); let requestFailures = 0; let failureReason: string | undefined;
   for (let monthsAgo = 1; monthsAgo <= months && data.length < limit; monthsAgo += 1) {
     const dealYmd = getSeoulTradeMonth(new Date(), monthsAgo);
     const settled = await settleInBatches(districts.flatMap((district) => types.map((type) => () => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd, numOfRows: perDistrict, districts, propertyType: type }))));
     requestFailures += settled.filter((result) => result.status === "rejected").length;
+    const firstFailure = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (!failureReason && firstFailure) failureReason = firstFailure.reason instanceof Error ? firstFailure.reason.message : "외부 거래 서버에 연결하지 못했습니다.";
     const monthData = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
     if (monthData.length > 0) { latestMonth = dealYmd; data = [...data, ...monthData]; }
   }
@@ -118,6 +120,8 @@ export async function fetchRecentAptTrades({ region = "seoul", months = 1, perDi
     const baselineMonth = getSeoulTradeMonth(new Date(), periodYears * 12 + 1);
     const baselineSettled = await settleInBatches(districts.flatMap((district) => types.map((type) => () => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd: baselineMonth, numOfRows: 10, districts, propertyType: type }))));
     requestFailures += baselineSettled.filter((result) => result.status === "rejected").length;
+    const firstBaselineFailure = baselineSettled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (!failureReason && firstBaselineFailure) failureReason = firstBaselineFailure.reason instanceof Error ? firstBaselineFailure.reason.message : "외부 거래 서버에 연결하지 못했습니다.";
     const baseline = baselineSettled.flatMap((result) => result.status === "fulfilled" ? result.value : []).filter((trade) => trade.priceMan > 0 && trade.area > 0);
     const baselinePsm = averagePsm(baseline); trendPct = baselinePsm > 0 ? Math.round(((currentPsm - baselinePsm) / baselinePsm) * 1000) / 10 : undefined;
   }
@@ -125,7 +129,7 @@ export async function fetchRecentAptTrades({ region = "seoul", months = 1, perDi
   const sourceWarning = requestFailures > 0
     ? propertyType === "villa" ? "빌라·다세대 거래 조회 일부가 실패했습니다. 서비스키 권한을 확인해 주세요." : "일부 지역의 거래 조회가 실패해 확인 가능한 결과만 표시합니다."
     : undefined;
-  const result = { expiresAt: Date.now() + 10 * 60 * 1000, data, month: latestMonth, region, propertyType, periodYears, sourceWarning, requestFailures }; regionCache.set(cacheKey, result); return result;
+  const result = { expiresAt: Date.now() + 10 * 60 * 1000, data, month: latestMonth, region, propertyType, periodYears, sourceWarning, requestFailures, failureReason }; regionCache.set(cacheKey, result); return result;
 }
 
 export async function fetchTrendSeries({ region = "seoul", propertyType = "apartment" }: { region?: RegionKey; propertyType?: Exclude<PropertyTypeFilter, "all"> } = {}) {
