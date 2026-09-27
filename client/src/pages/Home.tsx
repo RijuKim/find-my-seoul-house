@@ -487,7 +487,7 @@ export default function Home() {
       if (sort === "넓은 평형순") return b.area - a.area || b.score - a.score;
       return b.score - a.score;
     });
-  }, [cluster, area, budget.total, onlyFit, priceLimit, sort]);
+  }, [area, budget.total, cluster, listings, onlyFit, priceLimit, sort]);
 
   const selectedListings = selectedIds
     .map((id) => listings.find((listing) => listing.id === id))
