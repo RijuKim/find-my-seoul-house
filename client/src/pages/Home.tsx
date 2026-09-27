@@ -36,6 +36,7 @@ type Listing = {
   id: string;
   name: string;
   district: string;
+  districtName?: string;
   cluster: string;
   lat: number;
   lng: number;
@@ -285,7 +286,7 @@ function ListingVisual({ listing }: { listing: Listing }) {
         ))}
       </div>
       <div className="visual-copy">
-        <span>SEOUL / {listing.cluster.toUpperCase()}</span>
+        <span>{listing.districtName ?? "SEOUL"} / LOCATION</span>
         <strong>{listing.area}㎡</strong>
       </div>
       <div className="visual-stamp">{listing.score} MATCH</div>
@@ -483,7 +484,7 @@ export default function Home() {
   const [years, setYears] = useState(30);
   const [rate, setRate] = useState(4.2);
   const [ltv, setLtv] = useState(70);
-  const [cluster, setCluster] = useState("전체 생활권");
+  const [districtFilter, setDistrictFilter] = useState("전체 구");
   const [area, setArea] = useState("전체 평형");
   const [sort, setSort] = useState("추천순");
   const [priceLimit, setPriceLimit] = useState(80000);
@@ -518,6 +519,7 @@ export default function Home() {
       id: trade.id,
       name: trade.apartmentName,
       district: `${trade.district} ${trade.neighborhood}`,
+      districtName: trade.district,
       cluster: trade.cluster,
       lat: trade.lat,
       lng: trade.lng,
@@ -543,20 +545,22 @@ export default function Home() {
     }));
   }, [budget.total, tradeResponse]);
 
+  const districtOptions = useMemo(() => Array.from(new Set(listings.map((listing) => listing.districtName).filter((name): name is string => Boolean(name)))).sort((a, b) => a.localeCompare(b, "ko")), [listings]);
+
   const filteredListings = useMemo(() => {
     const next = listings.filter((listing) => {
-      const fitsCluster = cluster === "전체 생활권" || listing.cluster === cluster;
+      const fitsDistrict = districtFilter === "전체 구" || listing.districtName === districtFilter;
       const fitsArea = area === "전체 평형" || listing.areaBucket === area;
       const fitsBudget = !onlyFit || listing.price <= budget.total;
       const fitsPrice = listing.price <= priceLimit;
-      return fitsCluster && fitsArea && fitsBudget && fitsPrice;
+      return fitsDistrict && fitsArea && fitsBudget && fitsPrice;
     });
     return [...next].sort((a, b) => {
       if (sort === "낮은 가격순") return a.price - b.price;
       if (sort === "넓은 평형순") return b.area - a.area || b.score - a.score;
       return b.score - a.score;
     });
-  }, [area, budget.total, cluster, listings, onlyFit, priceLimit, sort]);
+  }, [area, budget.total, districtFilter, listings, onlyFit, priceLimit, sort]);
 
   const selectedListings = useMemo(() => selectedIds
     .map((id) => listings.find((listing) => listing.id === id))
@@ -692,9 +696,9 @@ export default function Home() {
 
           <div className="filter-toolbar">
             <div className="filter-main"><SlidersHorizontal size={17} /><span>FILTER BY</span></div>
-            <label className="select-control"><span>지역</span><select value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setCluster("전체 생활권"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
+            <label className="select-control"><span>지역</span><select value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setDistrictFilter("전체 구"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>주택유형</span><select value={propertyType} onChange={(event) => { setPropertyType(event.target.value as "all" | "apartment" | "villa"); setSelectedIds([]); }}><option value="apartment">아파트</option><option value="villa">빌라</option><option value="all">전체</option></select><ChevronDown size={14} /></label>
-            <label className="select-control"><span>생활권</span><select value={cluster} onChange={(event) => setCluster(event.target.value)}><option>전체 생활권</option><option>한강권</option><option>강남권</option><option>동남권</option><option>서남권</option><option>서북권</option><option>북부권</option><option>도심권</option><option>동북권</option><option>경기남부</option><option>경기북부</option></select><ChevronDown size={14} /></label>
+            <label className="select-control"><span>구·시</span><select value={districtFilter} onChange={(event) => setDistrictFilter(event.target.value)}><option>전체 구</option>{districtOptions.map((districtName) => <option key={districtName} value={districtName}>{districtName}</option>)}</select><ChevronDown size={14} /></label>
             <label className="select-control"><span>평형</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>전체 평형</option><option value="10평대">10평대</option><option value="20평대">20평대</option><option value="30평대">30평대</option><option value="40평대">40평대</option><option value="50평대 이상">50평대 이상</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>상승폭</span><select value={periodYears} onChange={(event) => setPeriodYears(Number(event.target.value) as 1 | 3 | 5 | 10)}><option value={1}>최근 1년</option><option value={3}>최근 3년</option><option value={5}>최근 5년</option><option value={10}>최근 10년</option></select><ChevronDown size={14} /></label>
             <label className="select-control price-select"><span>최대 가격</span><select value={priceLimit} onChange={(event) => setPriceLimit(Number(event.target.value))}><option value={60000}>6억</option><option value={70000}>7억</option><option value={80000}>8억</option><option value={100000}>10억</option><option value={200000}>20억</option></select><ChevronDown size={14} /></label>
@@ -723,7 +727,7 @@ export default function Home() {
                 {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} selected={selectedIds.includes(listing.id)} periodYears={periodYears} onSelect={() => toggleCompare(listing.id)} /></div>)}
               </div>
             ) : (
-              <div className="empty-state"><Search size={24} /><h3>{tradesError ? "실거래 데이터를 불러오지 못했어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError ? "잠시 후 다시 시도해 주세요." : "생활권이나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { setCluster("전체 생활권"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>필터 초기화 <ArrowRight size={15} /></button></div>
+              <div className="empty-state"><Search size={24} /><h3>{tradesError ? "실거래 데이터를 불러오지 못했어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError ? "잠시 후 다시 시도해 주세요." : "구·시나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { setDistrictFilter("전체 구"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>필터 초기화 <ArrowRight size={15} /></button></div>
             )}
           </div>
         </section>
