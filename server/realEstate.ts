@@ -2,6 +2,8 @@ import { ENV } from "./_core/env";
 
 export const MOLIT_APT_TRADE_ENDPOINT =
   "https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade";
+export const MOLIT_VILLA_TRADE_ENDPOINT =
+  "https://apis.data.go.kr/1613000/RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade";
 
 type DistrictMeta = { lawdCd: string; district: string; cluster: string; lat: number; lng: number };
 type DistrictRow = [string, string, string, number, number];
@@ -43,7 +45,7 @@ export type RegionKey = keyof typeof REGION_DISTRICTS;
 export type MolitAptTrade = {
   id: string; apartmentName: string; district: string; neighborhood: string; priceMan: number; area: number;
   floor: string; year: number; dealDate: string; jibun: string; roadName: string; lawdCd: string;
-  lat: number; lng: number; cluster: string;
+  lat: number; lng: number; cluster: string; propertyType: "apartment" | "villa"; trendPct?: number;
 };
 
 type MolitItem = Record<string, string | number | undefined>;
@@ -57,11 +59,11 @@ export function getSeoulTradeMonth(date = new Date(), monthsAgo = 0) {
   return `${target.getFullYear()}${String(target.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export async function fetchMolitAptTrades({ lawdCd, dealYmd, numOfRows = 100, districts = [...SEOUL_DISTRICTS, ...GYEONGGI_DISTRICTS] }: { lawdCd: string; dealYmd: string; numOfRows?: number; districts?: DistrictMeta[] }): Promise<MolitAptTrade[]> {
+export async function fetchMolitAptTrades({ lawdCd, dealYmd, numOfRows = 100, districts = [...SEOUL_DISTRICTS, ...GYEONGGI_DISTRICTS], propertyType = "apartment" }: { lawdCd: string; dealYmd: string; numOfRows?: number; districts?: DistrictMeta[]; propertyType?: "apartment" | "villa" }): Promise<MolitAptTrade[]> {
   if (!ENV.molitServiceKey) throw new Error("MOLIT_SERVICE_KEY is not configured");
   const districtMeta = districts.find((district) => district.lawdCd === lawdCd) ?? [...SEOUL_DISTRICTS, ...GYEONGGI_DISTRICTS].find((district) => district.lawdCd === lawdCd);
   if (!districtMeta) throw new Error(`Unsupported district code: ${lawdCd}`);
-  const url = new URL(MOLIT_APT_TRADE_ENDPOINT);
+  const url = new URL(propertyType === "villa" ? MOLIT_VILLA_TRADE_ENDPOINT : MOLIT_APT_TRADE_ENDPOINT);
   url.searchParams.set("serviceKey", ENV.molitServiceKey); url.searchParams.set("LAWD_CD", lawdCd); url.searchParams.set("DEAL_YMD", dealYmd);
   url.searchParams.set("pageNo", "1"); url.searchParams.set("numOfRows", String(numOfRows)); url.searchParams.set("_type", "json");
   const response = await fetch(url); const raw = await response.text();
@@ -70,23 +72,35 @@ export async function fetchMolitAptTrades({ lawdCd, dealYmd, numOfRows = 100, di
   const header = payload.response?.header;
   if (header?.resultCode && !["00", "000"].includes(header.resultCode)) throw new Error(`MOLIT API error ${header.resultCode}: ${header.resultMsg ?? "unknown"}`);
   return asArray(payload.response?.body?.items?.item).map((item, index) => {
-    const apartmentName = text(item.aptNm); const neighborhood = text(item.umdNm); const dealYear = text(item.dealYear); const dealMonth = text(item.dealMonth).padStart(2, "0"); const dealDay = text(item.dealDay).padStart(2, "0");
-    return { id: `${lawdCd}-${dealYear}${dealMonth}${dealDay}-${index}-${apartmentName}-${text(item.jibun)}`, apartmentName, district: districtMeta.district, neighborhood, priceMan: number(item.dealAmount), area: number(item.excluUseAr), floor: text(item.floor), year: number(item.buildYear), dealDate: `${dealYear}-${dealMonth}-${dealDay}`, jibun: text(item.jibun), roadName: text(item.roadNm), lawdCd, lat: districtMeta.lat, lng: districtMeta.lng, cluster: districtMeta.cluster };
+    const apartmentName = text(item.aptNm ?? item.mhouseNm ?? item.aptNm); const neighborhood = text(item.umdNm); const dealYear = text(item.dealYear); const dealMonth = text(item.dealMonth).padStart(2, "0"); const dealDay = text(item.dealDay).padStart(2, "0");
+    return { id: `${propertyType}-${lawdCd}-${dealYear}${dealMonth}${dealDay}-${index}-${apartmentName}-${text(item.jibun)}`, apartmentName, district: districtMeta.district, neighborhood, priceMan: number(item.dealAmount), area: number(item.excluUseAr), floor: text(item.floor), year: number(item.buildYear), dealDate: `${dealYear}-${dealMonth}-${dealDay}`, jibun: text(item.jibun), roadName: text(item.roadNm), lawdCd, lat: districtMeta.lat, lng: districtMeta.lng, cluster: districtMeta.cluster, propertyType };
   });
 }
 
-const regionCache = new Map<RegionKey, { expiresAt: number; data: MolitAptTrade[]; month: string }>();
-export async function fetchRecentAptTrades({ region = "seoul", months = 3, perDistrict = 20, limit = 240 }: { region?: RegionKey; months?: number; perDistrict?: number; limit?: number } = {}) {
-  const cached = regionCache.get(region); if (cached && cached.expiresAt > Date.now()) return { ...cached, region };
-  const districts = REGION_DISTRICTS[region]; let data: MolitAptTrade[] = []; let latestMonth = getSeoulTradeMonth(new Date(), 1);
+export type PropertyTypeFilter = "all" | "apartment" | "villa";
+const regionCache = new Map<string, { expiresAt: number; data: MolitAptTrade[]; month: string; region: RegionKey; propertyType: PropertyTypeFilter; periodYears: number; sourceWarning?: string }>();
+export async function fetchRecentAptTrades({ region = "seoul", months = 3, perDistrict = 20, limit = 240, propertyType = "all", periodYears = 1 }: { region?: RegionKey; months?: number; perDistrict?: number; limit?: number; propertyType?: PropertyTypeFilter; periodYears?: 1 | 3 | 5 | 10 } = {}) {
+  const cacheKey = `${region}:${propertyType}:${periodYears}`; const cached = regionCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) return cached;
+  const districts = REGION_DISTRICTS[region]; const types = propertyType === "all" ? ["apartment", "villa"] as const : [propertyType]; let data: MolitAptTrade[] = []; let latestMonth = getSeoulTradeMonth(new Date(), 1); let requestFailures = 0;
   for (let monthsAgo = 1; monthsAgo <= months && data.length < limit; monthsAgo += 1) {
     const dealYmd = getSeoulTradeMonth(new Date(), monthsAgo);
-    const settled = await Promise.allSettled(districts.map((district) => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd, numOfRows: perDistrict, districts })));
+    const settled = await Promise.allSettled(districts.flatMap((district) => types.map((type) => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd, numOfRows: perDistrict, districts, propertyType: type }))));
+    requestFailures += settled.filter((result) => result.status === "rejected").length;
     const monthData = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
     if (monthData.length > 0) { latestMonth = dealYmd; data = [...data, ...monthData]; }
   }
-  data = data.filter((trade) => trade.apartmentName && trade.priceMan > 0 && trade.area > 0).sort((a, b) => b.dealDate.localeCompare(a.dealDate) || a.priceMan - b.priceMan).slice(0, limit);
-  const result = { expiresAt: Date.now() + 10 * 60 * 1000, data, month: latestMonth, region }; regionCache.set(region, result); return result;
+  data = data.filter((trade) => trade.apartmentName && trade.priceMan > 0 && trade.area > 0);
+  const currentPsm = data.length ? data.reduce((sum, trade) => sum + trade.priceMan / trade.area, 0) / data.length : 0;
+  data = data.sort((a, b) => b.dealDate.localeCompare(a.dealDate) || a.priceMan - b.priceMan).slice(0, limit);
+  const baselineMonth = getSeoulTradeMonth(new Date(), periodYears * 12 + 1);
+  const baselineSettled = await Promise.allSettled(districts.flatMap((district) => types.map((type) => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd: baselineMonth, numOfRows: 10, districts, propertyType: type }))));
+  requestFailures += baselineSettled.filter((result) => result.status === "rejected").length;
+  const baseline = baselineSettled.flatMap((result) => result.status === "fulfilled" ? result.value : []).filter((trade) => trade.priceMan > 0 && trade.area > 0);
+  const averagePsm = (rows: MolitAptTrade[]) => rows.length ? rows.reduce((sum, trade) => sum + trade.priceMan / trade.area, 0) / rows.length : 0;
+  const baselinePsm = averagePsm(baseline); const trendPct = baselinePsm > 0 ? Math.round(((currentPsm - baselinePsm) / baselinePsm) * 1000) / 10 : undefined;
+  data = data.map((trade) => ({ ...trade, trendPct }));
+  const sourceWarning = propertyType === "villa" && requestFailures > 0 ? "연립·다세대 API 활용신청 또는 서비스키 권한을 확인해 주세요." : undefined;
+  const result = { expiresAt: Date.now() + 10 * 60 * 1000, data, month: latestMonth, region, propertyType, periodYears, sourceWarning }; regionCache.set(cacheKey, result); return result;
 }
 
 export const fetchRecentSeoulAptTrades = (options?: Omit<Parameters<typeof fetchRecentAptTrades>[0], "region">) => fetchRecentAptTrades({ ...options, region: "seoul" });

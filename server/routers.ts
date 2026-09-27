@@ -21,8 +21,8 @@ export const appRouter = router({
 
   realEstate: router({
     recentTrades: publicProcedure
-      .input(z.object({ region: z.enum(["seoul", "gyeonggi"]).default("seoul"), months: z.number().int().min(1).max(3).default(3) }).optional())
-      .query(({ input }) => fetchRecentAptTrades({ region: input?.region ?? "seoul", months: input?.months ?? 3 })),
+      .input(z.object({ region: z.enum(["seoul", "gyeonggi"]).default("seoul"), months: z.number().int().min(1).max(3).default(3), propertyType: z.enum(["all", "apartment", "villa"]).default("all"), periodYears: z.union([z.literal(1), z.literal(3), z.literal(5), z.literal(10)]).default(1) }).optional())
+      .query(({ input }) => fetchRecentAptTrades({ region: input?.region ?? "seoul", months: input?.months ?? 3, propertyType: input?.propertyType ?? "all", periodYears: input?.periodYears ?? 1 })),
   }),
 
   // TODO: add feature routers here, e.g.

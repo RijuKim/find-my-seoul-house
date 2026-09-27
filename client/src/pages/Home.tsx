@@ -50,6 +50,10 @@ type Listing = {
   accent: string;
   score: number;
   note: string;
+  propertyType?: "apartment" | "villa";
+  trendPct?: number;
+  areaBucket?: string;
+  builtAge?: number;
 };
 
 const sampleListings: Listing[] = [
@@ -289,10 +293,12 @@ function ListingCard({
   listing,
   selected,
   onSelect,
+  periodYears,
 }: {
   listing: Listing;
   selected: boolean;
   onSelect: () => void;
+  periodYears: number;
 }) {
   return (
     <article className={`listing-card ${selected ? "is-selected" : ""}`}>
@@ -324,8 +330,8 @@ function ListingCard({
           </div>
         </div>
         <div className="listing-stats">
-          <span>{listing.area}㎡ · {listing.floor}</span>
-          <span>{listing.year}년식</span>
+          <span>{listing.area}㎡ · {listing.areaBucket ?? "평형 확인"} · {listing.floor}</span>
+          <span>{listing.year > 0 ? `${listing.year}년식 · ${listing.builtAge}년차` : "연식 정보 없음"}</span>
         </div>
         <div className="listing-route">
           <TrainFront size={14} />
@@ -333,6 +339,8 @@ function ListingCard({
           <b>{listing.commute}</b>
         </div>
         <div className="tag-row">
+          <span>{listing.propertyType === "villa" ? "빌라" : "아파트"}</span>
+          {listing.trendPct !== undefined && <span className={listing.trendPct >= 0 ? "trend-up" : "trend-down"}>{periodYears}년 상승폭 {listing.trendPct >= 0 ? "+" : ""}{listing.trendPct}%</span>}
           {listing.tags.map((tag) => <span key={tag}>{tag}</span>)}
         </div>
       </div>
@@ -429,12 +437,14 @@ export default function Home() {
   const [sort, setSort] = useState("추천순");
   const [priceLimit, setPriceLimit] = useState(80000);
   const [onlyFit, setOnlyFit] = useState(true);
+  const [propertyType, setPropertyType] = useState<"all" | "apartment" | "villa">("apartment");
+  const [periodYears, setPeriodYears] = useState<1 | 3 | 5 | 10>(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [region, setRegion] = useState<"seoul" | "gyeonggi">("seoul");
   const { data: tradeResponse, isLoading: tradesLoading, isError: tradesError } = trpc.realEstate.recentTrades.useQuery(
-    { region, months: 3 },
+    { region, months: 3, propertyType, periodYears },
     { staleTime: 10 * 60 * 1000, retry: 1 },
   );
 
@@ -471,13 +481,17 @@ export default function Home() {
       accent: "#d2f36b",
       score: Math.max(60, Math.min(99, 92 - Math.round(Math.abs(trade.priceMan - budget.total) / Math.max(1, budget.total) * 30))),
       note: "국토교통부 신고 실거래",
+      propertyType: trade.propertyType,
+      trendPct: trade.trendPct,
+      areaBucket: trade.area < 66 ? "10평대" : trade.area < 99 ? "20평대" : trade.area < 132 ? "30평대" : trade.area < 165 ? "40평대" : "50평대 이상",
+      builtAge: trade.year > 0 ? Math.max(0, 2026 - trade.year) : 0,
     }));
   }, [budget.total, tradeResponse]);
 
   const filteredListings = useMemo(() => {
     const next = listings.filter((listing) => {
       const fitsCluster = cluster === "전체 생활권" || listing.cluster === cluster;
-      const fitsArea = area === "전체 평형" || listing.area === Number(area);
+      const fitsArea = area === "전체 평형" || listing.areaBucket === area;
       const fitsBudget = !onlyFit || listing.price <= budget.total;
       const fitsPrice = listing.price <= priceLimit;
       return fitsCluster && fitsArea && fitsBudget && fitsPrice;
@@ -605,15 +619,17 @@ export default function Home() {
           <div className="filter-toolbar">
             <div className="filter-main"><SlidersHorizontal size={17} /><span>FILTER BY</span></div>
             <label className="select-control"><span>지역</span><select value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setCluster("전체 생활권"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
+            <label className="select-control"><span>주택유형</span><select value={propertyType} onChange={(event) => { setPropertyType(event.target.value as "all" | "apartment" | "villa"); setSelectedIds([]); }}><option value="apartment">아파트</option><option value="villa">빌라</option><option value="all">전체</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>생활권</span><select value={cluster} onChange={(event) => setCluster(event.target.value)}><option>전체 생활권</option><option>한강권</option><option>강남권</option><option>동남권</option><option>서남권</option><option>서북권</option><option>북부권</option><option>도심권</option><option>동북권</option><option>경기남부</option><option>경기북부</option></select><ChevronDown size={14} /></label>
-            <label className="select-control"><span>평형</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>전체 평형</option><option value="49">49㎡대</option><option value="59">59㎡대</option></select><ChevronDown size={14} /></label>
+            <label className="select-control"><span>평형</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>전체 평형</option><option value="10평대">10평대</option><option value="20평대">20평대</option><option value="30평대">30평대</option><option value="40평대">40평대</option><option value="50평대 이상">50평대 이상</option></select><ChevronDown size={14} /></label>
+            <label className="select-control"><span>상승폭</span><select value={periodYears} onChange={(event) => setPeriodYears(Number(event.target.value) as 1 | 3 | 5 | 10)}><option value={1}>최근 1년</option><option value={3}>최근 3년</option><option value={5}>최근 5년</option><option value={10}>최근 10년</option></select><ChevronDown size={14} /></label>
             <label className="select-control price-select"><span>최대 가격</span><select value={priceLimit} onChange={(event) => setPriceLimit(Number(event.target.value))}><option value={60000}>6억</option><option value={70000}>7억</option><option value={80000}>8억</option><option value={100000}>10억</option><option value={200000}>20억</option></select><ChevronDown size={14} /></label>
             <button className={`fit-toggle ${onlyFit ? "is-on" : ""}`} onClick={() => setOnlyFit((current) => !current)}><span className="toggle-dot" /> 예산 안에만</button>
             <label className="sort-control"><ArrowDownUp size={15} /><select value={sort} onChange={(event) => setSort(event.target.value)}><option>추천순</option><option>낮은 가격순</option><option>넓은 평형순</option></select><ChevronDown size={14} /></label>
           </div>
 
           <div className="data-source-banner is-live">
-            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} 실제 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : `최근 ${tradeResponse?.month ?? "3개월"} 거래 · 국토교통부 아파트 매매 실거래가 자료`}</span></div></div>
+            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyType === "villa" ? "빌라" : propertyType === "apartment" ? "아파트" : "주택"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeResponse?.month ?? "3개월"} 거래 · ${periodYears}년 전과 비교한 면적당 가격 변화`}</span></div></div>
             <span className="api-ready-pill"><BadgeCheck size={14} /> {tradesLoading ? "LOADING" : "LIVE DATA"}</span>
           </div>
 
@@ -627,10 +643,10 @@ export default function Home() {
           <div className="listings-content">
             <div className="listings-summary"><span><strong>{filteredListings.length}</strong> RESULTS</span><span className="summary-line" /><span>국토부 신고 매매 / {region === "seoul" ? "서울" : "경기"} / {formatPrice(Math.min(priceLimit, budget.total))} 이하</span></div>
             {tradesLoading ? (
-              <div className="empty-state loading-state"><CircleDollarSign size={24} /><h3>실거래 데이터를 불러오는 중이에요.</h3><p>서울 25개 구의 최근 신고 내역을 확인하고 있어요.</p></div>
+              <div className="empty-state loading-state"><CircleDollarSign size={24} /><h3>실거래 데이터를 불러오는 중이에요.</h3><p>{region === "seoul" ? "서울 25개 구" : "경기 시·군·구"}의 최근 신고 내역을 확인하고 있어요.</p></div>
             ) : filteredListings.length > 0 ? (
               <div className="listing-grid">
-                {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} selected={selectedIds.includes(listing.id)} onSelect={() => toggleCompare(listing.id)} /></div>)}
+                {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} selected={selectedIds.includes(listing.id)} periodYears={periodYears} onSelect={() => toggleCompare(listing.id)} /></div>)}
               </div>
             ) : (
               <div className="empty-state"><Search size={24} /><h3>{tradesError ? "실거래 데이터를 불러오지 못했어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError ? "잠시 후 다시 시도해 주세요." : "생활권이나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { setCluster("전체 생활권"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>필터 초기화 <ArrowRight size={15} /></button></div>

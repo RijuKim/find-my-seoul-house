@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchMolitAptTrades, GYEONGGI_DISTRICTS } from "./realEstate";
+import { fetchMolitAptTrades, GYEONGGI_DISTRICTS, MOLIT_VILLA_TRADE_ENDPOINT } from "./realEstate";
 
 describe("MOLIT apartment trade API", () => {
   it("accepts the configured service key and returns a normalized list", async () => {
@@ -29,4 +29,8 @@ describe("MOLIT apartment trade API", () => {
       expect(trades[0]).toMatchObject({ lawdCd: "41135", district: "성남시 분당구" });
     }
   }, 20_000);
+
+  it("uses the official villa endpoint separately from the apartment endpoint", () => {
+    expect(MOLIT_VILLA_TRADE_ENDPOINT).toContain("RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade");
+  });
 });

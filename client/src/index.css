@@ -169,3 +169,7 @@
 .map-price-marker.is-selected { color: #162c4a; background: #d2f36b; border-color: #162c4a; box-shadow: 0 5px 14px rgba(22,44,74,.28), 0 0 0 3px rgba(210,243,107,.36); }
 .map-price-marker strong { font-size: .65rem; line-height: 1; }.map-price-marker span { max-width: 100px; overflow: hidden; color: inherit; font-size: .46rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 639px) { .data-source-banner { display: block; padding: .8rem; }.api-ready-pill { margin-top: .65rem; }.map-panel-header { padding: .9rem; }.map-stage { height: 360px; }.map-legend { right: .55rem; bottom: .55rem; gap: .45rem; padding: .45rem .5rem; }.map-legend span:last-child { display: none; }.map-source-note { top: .55rem; left: .55rem; } }
+
+
+.trend-up { color: #217a52 !important; background: #e8f6ed !important; }
+.trend-down { color: #b24c47 !important; background: #fff0ee !important; }
