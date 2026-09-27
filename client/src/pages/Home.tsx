@@ -495,6 +495,7 @@ export default function Home() {
   const [showComparison, setShowComparison] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [region, setRegion] = useState<"seoul" | "gyeonggi">("seoul");
+  const { data: districtMetadata } = trpc.realEstate.districts.useQuery({ region }, { staleTime: 60 * 60 * 1000 });
   const { data: tradeResponse, isLoading: tradesLoading, isError: tradesError } = trpc.realEstate.recentTrades.useQuery(
     { region, months: 3, propertyType, periodYears },
     { staleTime: 10 * 60 * 1000, retry: 1 },
@@ -545,7 +546,7 @@ export default function Home() {
     }));
   }, [budget.total, tradeResponse]);
 
-  const districtOptions = useMemo(() => Array.from(new Set(listings.map((listing) => listing.districtName).filter((name): name is string => Boolean(name)))).sort((a, b) => a.localeCompare(b, "ko")), [listings]);
+  const districtOptions = useMemo(() => districtMetadata?.map(({ district }) => district) ?? Array.from(new Set(listings.map((listing) => listing.districtName).filter((name): name is string => Boolean(name)))).sort((a, b) => a.localeCompare(b, "ko")), [districtMetadata, listings]);
 
   const filteredListings = useMemo(() => {
     const next = listings.filter((listing) => {
