@@ -45,7 +45,7 @@ export type RegionKey = keyof typeof REGION_DISTRICTS;
 export type MolitAptTrade = {
   id: string; apartmentName: string; district: string; neighborhood: string; priceMan: number; area: number;
   floor: string; year: number; dealDate: string; jibun: string; roadName: string; lawdCd: string;
-  lat: number; lng: number; cluster: string; propertyType: "apartment" | "villa"; trendPct?: number;
+  lat: number; lng: number; cluster: string; propertyType: "apartment" | "villa"; trendPct?: number; trendPcts?: Partial<Record<1 | 3 | 5 | 10, number>>;
 };
 
 type MolitItem = Record<string, string | number | undefined>;
@@ -53,6 +53,25 @@ type MolitPayload = { response?: { header?: { resultCode?: string; resultMsg?: s
 const asArray = (item: MolitItem | MolitItem[] | undefined) => !item ? [] : Array.isArray(item) ? item : [item];
 const text = (value: string | number | undefined) => String(value ?? "").trim();
 const number = (value: string | number | undefined) => Number(text(value).replace(/,/g, "")) || 0;
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+async function settleInBatches<T>(tasks: Array<() => Promise<T>>, batchSize = 5) {
+  const settled: PromiseSettledResult<T>[] = [];
+  for (let index = 0; index < tasks.length; index += batchSize) {
+    const batch = await Promise.allSettled(tasks.slice(index, index + batchSize).map((task) => task()));
+    settled.push(...batch);
+    if (index + batchSize < tasks.length) await pause(300);
+  }
+  return settled;
+}
+
+async function fetchWithBackoff(url: URL) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const response = await fetch(url);
+    if (response.status !== 429 || attempt === 3) return response;
+    await pause(800 * (attempt + 1));
+  }
+  return fetch(url);
+}
 
 export function getSeoulTradeMonth(date = new Date(), monthsAgo = 0) {
   const target = new Date(date.getFullYear(), date.getMonth() - monthsAgo, 1);
@@ -66,7 +85,7 @@ export async function fetchMolitAptTrades({ lawdCd, dealYmd, numOfRows = 100, di
   const url = new URL(propertyType === "villa" ? MOLIT_VILLA_TRADE_ENDPOINT : MOLIT_APT_TRADE_ENDPOINT);
   url.searchParams.set("serviceKey", ENV.molitServiceKey); url.searchParams.set("LAWD_CD", lawdCd); url.searchParams.set("DEAL_YMD", dealYmd);
   url.searchParams.set("pageNo", "1"); url.searchParams.set("numOfRows", String(numOfRows)); url.searchParams.set("_type", "json");
-  const response = await fetch(url); const raw = await response.text();
+  const response = await fetchWithBackoff(url); const raw = await response.text();
   if (!response.ok) throw new Error(`MOLIT API request failed: ${response.status}`);
   let payload: MolitPayload; try { payload = JSON.parse(raw) as MolitPayload; } catch { throw new Error("MOLIT API returned a non-JSON response"); }
   const header = payload.response?.header;
@@ -80,11 +99,11 @@ export async function fetchMolitAptTrades({ lawdCd, dealYmd, numOfRows = 100, di
 export type PropertyTypeFilter = "all" | "apartment" | "villa";
 const regionCache = new Map<string, { expiresAt: number; data: MolitAptTrade[]; month: string; region: RegionKey; propertyType: PropertyTypeFilter; periodYears: number; sourceWarning?: string }>();
 export async function fetchRecentAptTrades({ region = "seoul", months = 3, perDistrict = 20, limit = 240, propertyType = "all", periodYears = 1 }: { region?: RegionKey; months?: number; perDistrict?: number; limit?: number; propertyType?: PropertyTypeFilter; periodYears?: 1 | 3 | 5 | 10 } = {}) {
-  const cacheKey = `${region}:${propertyType}:${periodYears}`; const cached = regionCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) return cached;
+  const cacheKey = `v2:${region}:${propertyType}:${periodYears}`; const cached = regionCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) return cached;
   const districts = REGION_DISTRICTS[region]; const types = propertyType === "all" ? ["apartment", "villa"] as const : [propertyType]; let data: MolitAptTrade[] = []; let latestMonth = getSeoulTradeMonth(new Date(), 1); let requestFailures = 0;
   for (let monthsAgo = 1; monthsAgo <= months && data.length < limit; monthsAgo += 1) {
     const dealYmd = getSeoulTradeMonth(new Date(), monthsAgo);
-    const settled = await Promise.allSettled(districts.flatMap((district) => types.map((type) => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd, numOfRows: perDistrict, districts, propertyType: type }))));
+    const settled = await settleInBatches(districts.flatMap((district) => types.map((type) => () => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd, numOfRows: perDistrict, districts, propertyType: type }))));
     requestFailures += settled.filter((result) => result.status === "rejected").length;
     const monthData = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
     if (monthData.length > 0) { latestMonth = dealYmd; data = [...data, ...monthData]; }
@@ -92,15 +111,25 @@ export async function fetchRecentAptTrades({ region = "seoul", months = 3, perDi
   data = data.filter((trade) => trade.apartmentName && trade.priceMan > 0 && trade.area > 0);
   const currentPsm = data.length ? data.reduce((sum, trade) => sum + trade.priceMan / trade.area, 0) / data.length : 0;
   data = data.sort((a, b) => b.dealDate.localeCompare(a.dealDate) || a.priceMan - b.priceMan).slice(0, limit);
+  const averagePsm = (rows: MolitAptTrade[]) => rows.length ? rows.reduce((sum, trade) => sum + trade.priceMan / trade.area, 0) / rows.length : 0;
   const baselineMonth = getSeoulTradeMonth(new Date(), periodYears * 12 + 1);
-  const baselineSettled = await Promise.allSettled(districts.flatMap((district) => types.map((type) => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd: baselineMonth, numOfRows: 10, districts, propertyType: type }))));
+  const baselineSettled = await settleInBatches(districts.flatMap((district) => types.map((type) => () => fetchMolitAptTrades({ lawdCd: district.lawdCd, dealYmd: baselineMonth, numOfRows: 10, districts, propertyType: type }))));
   requestFailures += baselineSettled.filter((result) => result.status === "rejected").length;
   const baseline = baselineSettled.flatMap((result) => result.status === "fulfilled" ? result.value : []).filter((trade) => trade.priceMan > 0 && trade.area > 0);
-  const averagePsm = (rows: MolitAptTrade[]) => rows.length ? rows.reduce((sum, trade) => sum + trade.priceMan / trade.area, 0) / rows.length : 0;
   const baselinePsm = averagePsm(baseline); const trendPct = baselinePsm > 0 ? Math.round(((currentPsm - baselinePsm) / baselinePsm) * 1000) / 10 : undefined;
-  data = data.map((trade) => ({ ...trade, trendPct }));
+  data = data.map((trade) => ({ ...trade, trendPct, trendPcts: { [periodYears]: trendPct } }));
   const sourceWarning = propertyType === "villa" && requestFailures > 0 ? "연립·다세대 API 활용신청 또는 서비스키 권한을 확인해 주세요." : undefined;
   const result = { expiresAt: Date.now() + 10 * 60 * 1000, data, month: latestMonth, region, propertyType, periodYears, sourceWarning }; regionCache.set(cacheKey, result); return result;
+}
+
+export async function fetchTrendSeries({ region = "seoul", propertyType = "apartment" }: { region?: RegionKey; propertyType?: Exclude<PropertyTypeFilter, "all"> } = {}) {
+  const series: Partial<Record<1 | 3 | 5 | 10, number>> = {};
+  for (const years of [1, 3, 5, 10] as const) {
+    const result = await fetchRecentAptTrades({ region, propertyType, periodYears: years, months: 1, perDistrict: 8, limit: 80 });
+    const trend = result.data[0]?.trendPct;
+    if (trend !== undefined) series[years] = trend;
+  }
+  return series;
 }
 
 export const fetchRecentSeoulAptTrades = (options?: Omit<Parameters<typeof fetchRecentAptTrades>[0], "region">) => fetchRecentAptTrades({ ...options, region: "seoul" });

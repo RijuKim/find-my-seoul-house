@@ -52,6 +52,7 @@ type Listing = {
   note: string;
   propertyType?: "apartment" | "villa";
   trendPct?: number;
+  trendPcts?: Partial<Record<1 | 3 | 5 | 10, number>>;
   areaBucket?: string;
   builtAge?: number;
 };
@@ -483,6 +484,7 @@ export default function Home() {
       note: "국토교통부 신고 실거래",
       propertyType: trade.propertyType,
       trendPct: trade.trendPct,
+      trendPcts: trade.trendPcts,
       areaBucket: trade.area < 66 ? "10평대" : trade.area < 99 ? "20평대" : trade.area < 132 ? "30평대" : trade.area < 165 ? "40평대" : "50평대 이상",
       builtAge: trade.year > 0 ? Math.max(0, 2026 - trade.year) : 0,
     }));
@@ -503,9 +505,21 @@ export default function Home() {
     });
   }, [area, budget.total, cluster, listings, onlyFit, priceLimit, sort]);
 
-  const selectedListings = selectedIds
+  const selectedListings = useMemo(() => selectedIds
     .map((id) => listings.find((listing) => listing.id === id))
-    .filter(Boolean) as Listing[];
+    .filter(Boolean) as Listing[], [listings, selectedIds]);
+  const comparisonAnchor = useMemo(() => selectedListings[0] ? { lat: selectedListings[0].lat, lng: selectedListings[0].lng } : { lat: 0, lng: 0 }, [selectedListings]);
+  const { data: nearbySignals, isLoading: nearbyLoading } = trpc.realEstate.nearbySignals.useQuery(comparisonAnchor, {
+    enabled: showComparison && selectedListings.length > 0,
+    staleTime: 30 * 60 * 1000,
+    retry: 0,
+  });
+  const comparisonPropertyType = propertyType === "villa" ? "villa" : "apartment";
+  const { data: comparisonTrendSeries, isLoading: trendsLoading } = trpc.realEstate.trendSeries.useQuery({ region, propertyType: comparisonPropertyType }, {
+    enabled: showComparison && selectedListings.length > 0,
+    staleTime: 30 * 60 * 1000,
+    retry: 0,
+  });
 
   const toggleCompare = (id: string) => {
     setSelectedIds((current) => {
@@ -677,8 +691,17 @@ export default function Home() {
             <div className="comparison-dialog-head"><div><span className="section-kicker">COMPARE REPORT / 01</span><h2>내 예산 안에서,<br /><em>이 세 집을 비교했어요.</em></h2></div><button className="dialog-close" onClick={() => setShowComparison(false)} aria-label="비교 리포트 닫기"><X size={20} /></button></div>
             <div className="comparison-budget"><WalletCards size={16} /><span>내 탐색 예산</span><strong>{formatPrice(budget.total)}</strong><span className="comparison-budget-spacer" /><span>선택 {selectedListings.length}/3</span></div>
             <div className="comparison-grid">
-              {selectedListings.map((listing) => <div className="comparison-column" key={listing.id}><ListingVisual listing={listing} /><div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district}</p></div><div className="comparison-price"><span>매매가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div><div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡</b></div><div><span>입주연도</span><b>{listing.year}년</b></div><div><span>역까지</span><b>{listing.station.split(" 도보")[0]}</b></div><div><span>추천점수</span><b className="score-text"><Star size={12} fill="currentColor" /> {listing.score}</b></div></div><div className="comparison-tags">{listing.tags.map((tag) => <span key={tag}><Check size={12} /> {tag}</span>)}</div></div>)}
+              {selectedListings.map((listing) => <div className="comparison-column" key={listing.id}>
+                <ListingVisual listing={listing} />
+                <div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district} · {listing.propertyType === "villa" ? "빌라" : "아파트"}</p></div>
+                <div className="comparison-price"><span>최근 신고가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div>
+                <div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡ · {listing.areaBucket}</b></div><div><span>연식</span><b>{listing.year > 0 ? `${listing.builtAge}년차` : "정보 없음"}</b></div><div><span>교통 기준</span><b>{listing.station.split(" 도보")[0]}</b></div><div><span>추천점수</span><b className="score-text"><Star size={12} fill="currentColor" /> {listing.score}</b></div></div>
+                <div className="trend-report"><div className="comparison-subhead"><TrendingUp size={14} /> 기간별 상승폭 · 필터와 무관하게 전체 표시</div><div className="trend-report-grid">{([1, 3, 5, 10] as const).map((yearsAgo) => { const trend = comparisonTrendSeries?.[yearsAgo] ?? listing.trendPcts?.[yearsAgo]; return <div key={yearsAgo}><span>{yearsAgo}년</span><b className={(trend ?? 0) >= 0 ? "trend-up" : "trend-down"}>{trendsLoading ? "조회 중" : trend === undefined ? "데이터 없음" : `${trend >= 0 ? "+" : ""}${trend}%`}</b></div>; })}</div></div>
+                <div className="complex-data-panel"><div className="comparison-subhead"><Building2 size={14} /> 단지·관리 정보</div><div className="comparison-data-grid"><div><span>세대수</span><b>단지코드 매칭 필요</b></div><div><span>용적률</span><b>단지코드 매칭 필요</b></div><div><span>주차대수</span><b>단지코드 매칭 필요</b></div><div><span>공식 출처</span><b>K-apt / 공동주택 기본정보</b></div></div></div>
+                <div className="comparison-tags">{listing.tags.map((tag) => <span key={tag}><Check size={12} /> {tag}</span>)}</div>
+              </div>)}
             </div>
+            <div className="location-report"><div><span className="section-kicker">LOCATION SIGNALS / 01</span><h3>첫 번째 선택 매물 주변 입지</h3><p>지도 좌표 기준 반경 1.2km의 Google 장소 데이터를 집계합니다.</p></div><div className="location-signal-grid">{nearbyLoading ? <span className="location-loading">상권·학군·교통 데이터를 불러오는 중이에요.</span> : nearbySignals?.map((signal) => <div className="location-signal" key={signal.category}><span>{signal.category}</span><strong>{signal.count}곳</strong><small>{signal.topPlaces.length ? signal.topPlaces.join(" · ") : "주요 장소 없음"}{signal.averageRating ? ` · 평균 ${signal.averageRating}점` : ""}</small></div>) ?? <span className="location-loading">주변 장소 데이터를 표시하려면 매물을 선택하세요.</span>}</div></div>
             <div className="comparison-dialog-foot"><span><BadgeCheck size={16} /> 국토교통부 신고 실거래 기준 · 현재 매물 여부는 별도 확인</span><button onClick={() => { setShowComparison(false); toast("비교 결과를 저장했어요", { description: "다음에 다시 이 화면에서 이어서 볼 수 있어요." }); }}>비교 결과 저장 <ArrowRight size={15} /></button></div>
           </div>
         </div>
