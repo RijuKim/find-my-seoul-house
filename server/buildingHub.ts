@@ -50,7 +50,7 @@ export async function fetchBuildingHubRecap({ sigunguCd, bjdongCd, bun, ji = "00
     let response: Response | undefined;
     let raw = "";
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      response = await fetch(url);
+      response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
       raw = await response.text();
       if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) break;
       await pause(700 * (attempt + 1));

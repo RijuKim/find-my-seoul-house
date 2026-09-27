@@ -67,7 +67,7 @@ async function requestKapt<T extends KaptResponse>(base: string, path: string, s
   url.searchParams.set("serviceKey", decodeURIComponent(serviceKey));
   url.searchParams.set("_type", "json");
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   const raw = await response.text();
   if (!response.ok) throw new Error(`K-apt request failed: ${response.status}`);
   let payload: T;
@@ -104,20 +104,20 @@ export async function fetchKaptComplexInfo(candidates: KaptCandidate[]): Promise
       const matched = await findComplex(candidate);
       const kaptCode = text(matched?.kaptCode);
       if (!kaptCode) return { id: candidate.id, status: "not_found", statusMessage: "실거래 단지명과 일치하는 K-apt 단지를 찾지 못했습니다.", source: "none" };
-      const [basicResponse, detailResponse] = await Promise.all([
+      const bjdCode = text(matched.bjdCode);
+      const [candidateBun, candidateJi = "0000"] = text(candidate.jibun).split(/[-–—]/).map((part) => part.trim());
+      const [basicResponse, detailResponse, buildingRecap] = await Promise.all([
         requestKapt<KaptResponse>(KAPT_BASIS_ENDPOINT, "getAphusBassInfoV5", ENV.kaptBasisServiceKey, { kaptCode }),
         requestKapt<KaptResponse>(KAPT_BASIS_ENDPOINT, "getAphusDtlInfoV5", ENV.kaptBasisServiceKey, { kaptCode }),
+        fetchBuildingHubRecap({
+          sigunguCd: candidate.lawdCd,
+          bjdongCd: bjdCode.length >= 10 ? bjdCode.slice(5) : "",
+          bun: candidateBun ?? "",
+          ji: candidateJi || "0000",
+        }),
       ]);
       const basic = (asArray(basicResponse.response?.body?.item ?? basicResponse.response?.body?.items)[0] ?? {}) as KaptItem;
       const detail = (asArray(detailResponse.response?.body?.item ?? detailResponse.response?.body?.items)[0] ?? {}) as KaptItem;
-      const bjdCode = text(matched.bjdCode);
-      const [candidateBun, candidateJi = "0000"] = text(candidate.jibun).split(/[-–—]/).map((part) => part.trim());
-      const buildingRecap = await fetchBuildingHubRecap({
-        sigunguCd: candidate.lawdCd,
-        bjdongCd: bjdCode.length >= 10 ? bjdCode.slice(5) : "",
-        bun: candidateBun ?? "",
-        ji: candidateJi || "0000",
-      });
       const households = number(basic.kaptdaCnt);
       const parkingGround = number(detail.kaptdPcnt);
       const parkingUnderground = number(detail.kaptdPcntu);

@@ -344,7 +344,7 @@ function ListingCard({
           <b>{listing.commute}</b>
         </div>
         <div className="tag-row">
-          <span>{listing.propertyType === "villa" ? "빌라" : "아파트"}</span>
+          <span>{listing.propertyType === "villa" ? "연립·다세대 API" : "아파트 API"}</span>
           {listing.trendPct !== undefined && <span className={listing.trendPct >= 0 ? "trend-up" : "trend-down"}>{periodYears}년 상승폭 {listing.trendPct >= 0 ? "+" : ""}{listing.trendPct}%</span>}
           {listing.tags.map((tag) => <span key={tag}>{tag}</span>)}
         </div>
@@ -698,7 +698,7 @@ export default function Home() {
           <div className="filter-toolbar">
             <div className="filter-main"><SlidersHorizontal size={17} /><span>FILTER BY</span></div>
             <label className="select-control"><span>지역</span><select value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setDistrictFilter("전체 구"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
-            <label className="select-control"><span>주택유형</span><select value={propertyType} onChange={(event) => { setPropertyType(event.target.value as "all" | "apartment" | "villa"); setSelectedIds([]); }}><option value="apartment">아파트</option><option value="villa">빌라</option><option value="all">전체</option></select><ChevronDown size={14} /></label>
+            <label className="select-control"><span>주택유형</span><select value={propertyType} onChange={(event) => { setPropertyType(event.target.value as "all" | "apartment" | "villa"); setSelectedIds([]); }}><option value="apartment">아파트 API</option><option value="villa">연립·다세대 API</option><option value="all">전체 API</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>구·시</span><select value={districtFilter} onChange={(event) => setDistrictFilter(event.target.value)}><option>전체 구</option>{districtOptions.map((districtName) => <option key={districtName} value={districtName}>{districtName}</option>)}</select><ChevronDown size={14} /></label>
             <label className="select-control"><span>평형</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>전체 평형</option><option value="10평대">10평대</option><option value="20평대">20평대</option><option value="30평대">30평대</option><option value="40평대">40평대</option><option value="50평대 이상">50평대 이상</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>상승폭</span><select value={periodYears} onChange={(event) => setPeriodYears(Number(event.target.value) as 1 | 3 | 5 | 10)}><option value={1}>최근 1년</option><option value={3}>최근 3년</option><option value={5}>최근 5년</option><option value={10}>최근 10년</option></select><ChevronDown size={14} /></label>
@@ -708,7 +708,7 @@ export default function Home() {
           </div>
 
           <div className="data-source-banner is-live">
-            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyType === "villa" ? "빌라" : propertyType === "apartment" ? "아파트" : "주택"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeResponse?.month ?? "3개월"} 거래 · ${periodYears}년 전과 비교한 면적당 가격 변화`}</span></div></div>
+            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyType === "villa" ? "연립·다세대" : propertyType === "apartment" ? "아파트 API(도시형 포함 가능)" : "주택 API"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeResponse?.month ?? "3개월"} 거래 · ${periodYears}년 전과 비교한 면적당 가격 변화`}</span></div></div>
             <span className="api-ready-pill"><BadgeCheck size={14} /> {tradesLoading ? "LOADING" : "LIVE DATA"}</span>
           </div>
 
@@ -758,7 +758,7 @@ export default function Home() {
             <div className="comparison-grid">
               {selectedListings.map((listing) => <div className="comparison-column" key={listing.id}>
                 <ListingVisual listing={listing} />
-                <div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district} · {listing.propertyType === "villa" ? "빌라" : "아파트"}</p></div>
+                <div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district} · {listing.propertyType === "villa" ? "연립·다세대 API" : "아파트 API(도시형 포함 가능)"}</p></div>
                 <div className="comparison-price"><span>최근 신고가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div>
                 <div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡ · {listing.areaBucket}</b></div><div><span>연식</span><b>{listing.year > 0 ? `${listing.builtAge}년차` : "정보 없음"}</b></div><div><span>교통 기준</span><b>{listing.station.split(" 도보")[0]}</b></div><div><span>추천점수</span><b className="score-text"><Star size={12} fill="currentColor" /> {listing.score}</b></div></div>
                 <div className="trend-report"><div className="comparison-subhead"><TrendingUp size={14} /> 기간별 상승폭 · 필터와 무관하게 전체 표시</div><div className="trend-report-grid">{([1, 3, 5, 10] as const).map((yearsAgo) => { const trend = comparisonTrendSeries?.[yearsAgo] ?? listing.trendPcts?.[yearsAgo]; return <div key={yearsAgo}><span>{yearsAgo}년</span><b className={(trend ?? 0) >= 0 ? "trend-up" : "trend-down"}>{trendsLoading ? "조회 중" : trend === undefined ? "데이터 없음" : `${trend >= 0 ? "+" : ""}${trend}%`}</b></div>; })}</div></div>
