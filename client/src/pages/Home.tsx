@@ -747,7 +747,7 @@ export default function Home() {
                 {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} selected={selectedIds.includes(listing.id)} periodYears={periodYears} onSelect={() => toggleCompare(listing.id)} /></div>)}
               </div>
             ) : (
-              <div className="empty-state"><Search size={24} /><h3>{tradesError ? "실거래 데이터를 불러오지 못했어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError ? "잠시 후 다시 시도해 주세요." : "구·시나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { setDistrictFilter("전체 구"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>필터 초기화 <ArrowRight size={15} /></button></div>
+              <div className="empty-state"><Search size={24} /><h3>{tradesError || tradeResponse?.sourceWarning ? "실거래 데이터를 일부 불러오지 못했어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError || tradeResponse?.sourceWarning ? (tradeResponse?.sourceWarning ?? "잠시 후 다시 시도해 주세요.") : "구·시나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { setDistrictFilter("전체 구"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>필터 초기화 <ArrowRight size={15} /></button></div>
             )}
           </div>
         </section>

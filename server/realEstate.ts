@@ -98,7 +98,7 @@ export async function fetchMolitAptTrades({ lawdCd, dealYmd, numOfRows = 100, di
 }
 
 export type PropertyTypeFilter = "all" | "apartment" | "villa";
-const regionCache = new Map<string, { expiresAt: number; data: MolitAptTrade[]; month: string; region: RegionKey; propertyType: PropertyTypeFilter; periodYears: number; sourceWarning?: string }>();
+const regionCache = new Map<string, { expiresAt: number; data: MolitAptTrade[]; month: string; region: RegionKey; propertyType: PropertyTypeFilter; periodYears: number; sourceWarning?: string; requestFailures: number }>();
 export async function fetchRecentAptTrades({ region = "seoul", months = 1, perDistrict = 20, limit = 240, propertyType = "all", periodYears = 1, includeTrend = false }: { region?: RegionKey; months?: number; perDistrict?: number; limit?: number; propertyType?: PropertyTypeFilter; periodYears?: 1 | 3 | 5 | 10; includeTrend?: boolean } = {}) {
   const cacheKey = `v4:${region}:${propertyType}:${periodYears}:${months}:${perDistrict}:${limit}:${includeTrend}`; const cached = regionCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) return cached;
   const districts = REGION_DISTRICTS[region]; const types = propertyType === "all" ? ["apartment", "villa"] as const : [propertyType]; let data: MolitAptTrade[] = []; let latestMonth = getSeoulTradeMonth(new Date(), 1); let requestFailures = 0;
@@ -122,8 +122,10 @@ export async function fetchRecentAptTrades({ region = "seoul", months = 1, perDi
     const baselinePsm = averagePsm(baseline); trendPct = baselinePsm > 0 ? Math.round(((currentPsm - baselinePsm) / baselinePsm) * 1000) / 10 : undefined;
   }
   data = data.map((trade) => ({ ...trade, trendPct, trendPcts: { [periodYears]: trendPct } }));
-  const sourceWarning = propertyType === "villa" && requestFailures > 0 ? "연립·다세대 API 활용신청 또는 서비스키 권한을 확인해 주세요." : undefined;
-  const result = { expiresAt: Date.now() + 10 * 60 * 1000, data, month: latestMonth, region, propertyType, periodYears, sourceWarning }; regionCache.set(cacheKey, result); return result;
+  const sourceWarning = requestFailures > 0
+    ? propertyType === "villa" ? "빌라·다세대 거래 조회 일부가 실패했습니다. 서비스키 권한을 확인해 주세요." : "일부 지역의 거래 조회가 실패해 확인 가능한 결과만 표시합니다."
+    : undefined;
+  const result = { expiresAt: Date.now() + 10 * 60 * 1000, data, month: latestMonth, region, propertyType, periodYears, sourceWarning, requestFailures }; regionCache.set(cacheKey, result); return result;
 }
 
 export async function fetchTrendSeries({ region = "seoul", propertyType = "apartment" }: { region?: RegionKey; propertyType?: Exclude<PropertyTypeFilter, "all"> } = {}) {
