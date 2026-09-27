@@ -55,12 +55,12 @@ const text = (value: string | number | undefined) => String(value ?? "").trim();
 const number = (value: string | number | undefined) => Number(text(value).replace(/,/g, "")) || 0;
 export const isLikelyNonApartmentName = (name: string) => /(빌라|아이빌|아스하임|큐브|오피스텔|도시형)/i.test(name);
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-async function settleInBatches<T>(tasks: Array<() => Promise<T>>, batchSize = 12) {
+async function settleInBatches<T>(tasks: Array<() => Promise<T>>, batchSize = 25) {
   const settled: PromiseSettledResult<T>[] = [];
   for (let index = 0; index < tasks.length; index += batchSize) {
     const batch = await Promise.allSettled(tasks.slice(index, index + batchSize).map((task) => task()));
     settled.push(...batch);
-    if (index + batchSize < tasks.length) await pause(250);
+    if (index + batchSize < tasks.length) await pause(150);
   }
   return settled;
 }
