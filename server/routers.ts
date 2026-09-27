@@ -5,6 +5,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { fetchRecentAptTrades, fetchTrendSeries } from "./realEstate";
 import { z } from "zod";
 import { fetchPlaceSignals } from "./places";
+import { fetchKaptComplexInfo } from "./kapt";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -30,6 +31,9 @@ export const appRouter = router({
     trendSeries: publicProcedure
       .input(z.object({ region: z.enum(["seoul", "gyeonggi"]).default("seoul"), propertyType: z.enum(["apartment", "villa"]).default("apartment") }))
       .query(({ input }) => fetchTrendSeries(input)),
+    complexInfo: publicProcedure
+      .input(z.object({ candidates: z.array(z.object({ id: z.string(), apartmentName: z.string(), lawdCd: z.string(), neighborhood: z.string().optional(), jibun: z.string().optional(), propertyType: z.enum(["apartment", "villa"]).optional() })).max(3) }))
+      .query(({ input }) => fetchKaptComplexInfo(input.candidates)),
   }),
 
   // TODO: add feature routers here, e.g.

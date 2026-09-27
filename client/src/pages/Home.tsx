@@ -50,6 +50,9 @@ type Listing = {
   accent: string;
   score: number;
   note: string;
+  lawdCd?: string;
+  neighborhood?: string;
+  jibun?: string;
   propertyType?: "apartment" | "villa";
   trendPct?: number;
   trendPcts?: Partial<Record<1 | 3 | 5 | 10, number>>;
@@ -482,6 +485,9 @@ export default function Home() {
       accent: "#d2f36b",
       score: Math.max(60, Math.min(99, 92 - Math.round(Math.abs(trade.priceMan - budget.total) / Math.max(1, budget.total) * 30))),
       note: "국토교통부 신고 실거래",
+      lawdCd: trade.lawdCd,
+      neighborhood: trade.neighborhood,
+      jibun: trade.jibun,
       propertyType: trade.propertyType,
       trendPct: trade.trendPct,
       trendPcts: trade.trendPcts,
@@ -509,6 +515,13 @@ export default function Home() {
     .map((id) => listings.find((listing) => listing.id === id))
     .filter(Boolean) as Listing[], [listings, selectedIds]);
   const comparisonAnchor = useMemo(() => selectedListings[0] ? { lat: selectedListings[0].lat, lng: selectedListings[0].lng } : { lat: 0, lng: 0 }, [selectedListings]);
+  const kaptCandidates = useMemo(() => selectedListings.map((listing) => ({ id: listing.id, apartmentName: listing.name, lawdCd: listing.lawdCd ?? "", neighborhood: listing.neighborhood, jibun: listing.jibun, propertyType: listing.propertyType ?? "apartment" as const })), [selectedListings]);
+  const { data: complexInfos, isLoading: complexInfoLoading } = trpc.realEstate.complexInfo.useQuery({ candidates: kaptCandidates }, {
+    enabled: showComparison && kaptCandidates.length > 0 && kaptCandidates.every((candidate) => Boolean(candidate.lawdCd)),
+    staleTime: 60 * 60 * 1000,
+    retry: 0,
+  });
+  const complexInfoById = useMemo(() => new Map((complexInfos ?? []).map((info) => [info.id, info])), [complexInfos]);
   const { data: nearbySignals, isLoading: nearbyLoading } = trpc.realEstate.nearbySignals.useQuery(comparisonAnchor, {
     enabled: showComparison && selectedListings.length > 0,
     staleTime: 30 * 60 * 1000,
@@ -697,7 +710,7 @@ export default function Home() {
                 <div className="comparison-price"><span>최근 신고가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div>
                 <div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡ · {listing.areaBucket}</b></div><div><span>연식</span><b>{listing.year > 0 ? `${listing.builtAge}년차` : "정보 없음"}</b></div><div><span>교통 기준</span><b>{listing.station.split(" 도보")[0]}</b></div><div><span>추천점수</span><b className="score-text"><Star size={12} fill="currentColor" /> {listing.score}</b></div></div>
                 <div className="trend-report"><div className="comparison-subhead"><TrendingUp size={14} /> 기간별 상승폭 · 필터와 무관하게 전체 표시</div><div className="trend-report-grid">{([1, 3, 5, 10] as const).map((yearsAgo) => { const trend = comparisonTrendSeries?.[yearsAgo] ?? listing.trendPcts?.[yearsAgo]; return <div key={yearsAgo}><span>{yearsAgo}년</span><b className={(trend ?? 0) >= 0 ? "trend-up" : "trend-down"}>{trendsLoading ? "조회 중" : trend === undefined ? "데이터 없음" : `${trend >= 0 ? "+" : ""}${trend}%`}</b></div>; })}</div></div>
-                <div className="complex-data-panel"><div className="comparison-subhead"><Building2 size={14} /> 단지·관리 정보</div><div className="comparison-data-grid"><div><span>세대수</span><b>단지코드 매칭 필요</b></div><div><span>용적률</span><b>단지코드 매칭 필요</b></div><div><span>주차대수</span><b>단지코드 매칭 필요</b></div><div><span>공식 출처</span><b>K-apt / 공동주택 기본정보</b></div></div></div>
+                <div className="complex-data-panel"><div className="comparison-subhead"><Building2 size={14} /> 단지·관리 정보 <span className="kapt-source-badge">K-apt LIVE</span></div><div className="comparison-data-grid"><div><span>세대수</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.households ? `${complexInfoById.get(listing.id)!.households!.toLocaleString()}세대` : "매칭 정보 없음"}</b></div><div><span>동수 · 사용승인</span><b>{complexInfoLoading ? "조회 중" : `${complexInfoById.get(listing.id)?.buildingCount ? `${complexInfoById.get(listing.id)!.buildingCount}개동` : "동수 없음"} · ${complexInfoById.get(listing.id)?.approvalDate ?? "날짜 없음"}`}</b></div><div><span>총 주차대수</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.parkingTotal ? `${complexInfoById.get(listing.id)!.parkingTotal!.toLocaleString()}대` : "주차 정보 없음"}</b></div><div><span>세대당 주차</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.parkingPerHousehold ? `${complexInfoById.get(listing.id)!.parkingPerHousehold}대` : "계산 불가"}</b></div><div><span>용적률</span><b className="data-pending">건축물대장 API 연결 필요</b></div><div><span>데이터 상태</span><b>{complexInfoById.get(listing.id)?.statusMessage ?? "K-apt 조회 대기"}</b></div></div></div>
                 <div className="comparison-tags">{listing.tags.map((tag) => <span key={tag}><Check size={12} /> {tag}</span>)}</div>
               </div>)}
             </div>

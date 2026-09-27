@@ -193,3 +193,6 @@
 .location-signal small { color: #88968f; font-size: .56rem; line-height: 1.45; }
 .location-loading { color: #7d8d87; font-size: .68rem; }
 @media (max-width: 720px) { .location-report { grid-template-columns: 1fr; } .location-signal-grid { grid-template-columns: 1fr; } .trend-report-grid, .comparison-data-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.kapt-source-badge { display: inline-flex; align-items: center; padding: .18rem .35rem; margin-left: .25rem; border-radius: 999px; background: #dff3c1; color: #56743e; font-size: .52rem; letter-spacing: .03em; }
+.data-pending { color: #9b8561 !important; }
