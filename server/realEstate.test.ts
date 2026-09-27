@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { fetchMolitAptTrades, GYEONGGI_DISTRICTS, MOLIT_VILLA_TRADE_ENDPOINT } from "./realEstate";
+import { fetchMolitAptTrades, GYEONGGI_DISTRICTS, isLikelyNonApartmentName, MOLIT_VILLA_TRADE_ENDPOINT } from "./realEstate";
 
 describe("MOLIT apartment trade API", () => {
+  it("flags villa-like names that can be mixed into the apartment feed", () => {
+    expect(isLikelyNonApartmentName("용산큐브" )).toBe(true);
+    expect(isLikelyNonApartmentName("아스하임" )).toBe(true);
+    expect(isLikelyNonApartmentName("서초대우아이빌" )).toBe(true);
+    expect(isLikelyNonApartmentName("래미안 원베일리" )).toBe(false);
+  });
+
   it("accepts the configured service key and returns a normalized list", async () => {
     const trades = await fetchMolitAptTrades({
       lawdCd: "11110",

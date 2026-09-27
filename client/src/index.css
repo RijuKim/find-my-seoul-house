@@ -205,3 +205,15 @@
 .kapt-signal-card strong { display: block; margin-top: .45rem; overflow: hidden; color: #244254; font-size: .68rem; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 .kapt-signal-card small { display: block; margin-top: .3rem; overflow: hidden; color: #89978f; font-size: .53rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 720px) { .kapt-signal-grid { grid-template-columns: 1fr; } .kapt-signal-card strong, .kapt-signal-card small { white-space: normal; } }
+
+/* User-facing property type multi-select and scroll-safe comparison report */
+.multi-select-control { display: flex; align-items: center; gap: .55rem; min-height: 32px; padding: 0 .65rem; color: #879490; border-left: 1px solid #e2e8e1; font-size: .63rem; white-space: nowrap; }
+.multi-select-control > span { margin-right: .1rem; }
+.multi-select-control label { display: inline-flex; align-items: center; gap: .25rem; color: #334f5a; font-size: .65rem; font-weight: 800; }
+.multi-select-control input { width: 13px; height: 13px; accent-color: #71955a; }
+.comparison-overlay { overflow-y: auto; overscroll-behavior: contain; }
+.comparison-dialog { max-height: calc(100dvh - 3rem); min-height: 0; overflow-x: hidden; overflow-y: auto; }
+.comparison-grid { min-width: 0; }
+@media (min-width: 1024px) { .comparison-dialog { width: min(1240px, calc(100vw - 4rem)); } .comparison-column { min-width: 0; } }
+@media (max-width: 1023px) { .multi-select-control { border-left: 0; padding: 0 .4rem; } }
+@media (max-width: 639px) { .multi-select-control { width: 100%; } }

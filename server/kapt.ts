@@ -67,7 +67,7 @@ async function requestKapt<T extends KaptResponse>(base: string, path: string, s
   url.searchParams.set("serviceKey", decodeURIComponent(serviceKey));
   url.searchParams.set("_type", "json");
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   const raw = await response.text();
   if (!response.ok) throw new Error(`K-apt request failed: ${response.status}`);
   let payload: T;

@@ -26,8 +26,8 @@ export const appRouter = router({
       .input(z.object({ region: z.enum(["seoul", "gyeonggi"]).default("seoul") }))
       .query(({ input }) => REGION_DISTRICTS[input.region].map(({ lawdCd, district }) => ({ lawdCd, district }))),
     recentTrades: publicProcedure
-      .input(z.object({ region: z.enum(["seoul", "gyeonggi"]).default("seoul"), months: z.number().int().min(1).max(3).default(3), propertyType: z.enum(["all", "apartment", "villa"]).default("all"), periodYears: z.union([z.literal(1), z.literal(3), z.literal(5), z.literal(10)]).default(1) }).optional())
-      .query(({ input }) => fetchRecentAptTrades({ region: input?.region ?? "seoul", months: input?.months ?? 3, propertyType: input?.propertyType ?? "all", periodYears: input?.periodYears ?? 1 })),
+      .input(z.object({ region: z.enum(["seoul", "gyeonggi"]).default("seoul"), months: z.number().int().min(1).max(3).default(1), propertyType: z.enum(["all", "apartment", "villa"]).default("all"), periodYears: z.union([z.literal(1), z.literal(3), z.literal(5), z.literal(10)]).default(1) }).optional())
+      .query(({ input }) => fetchRecentAptTrades({ region: input?.region ?? "seoul", months: input?.months ?? 1, propertyType: input?.propertyType ?? "all", periodYears: input?.periodYears ?? 1 })),
     nearbySignals: publicProcedure
       .input(z.object({ lat: z.number(), lng: z.number() }))
       .query(({ input }) => fetchPlaceSignals(input.lat, input.lng)),

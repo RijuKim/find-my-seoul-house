@@ -344,7 +344,7 @@ function ListingCard({
           <b>{listing.commute}</b>
         </div>
         <div className="tag-row">
-          <span>{listing.propertyType === "villa" ? "연립·다세대 API" : "아파트 API"}</span>
+          <span>{listing.propertyType === "villa" ? "빌라" : "아파트"}</span>
           {listing.trendPct !== undefined && <span className={listing.trendPct >= 0 ? "trend-up" : "trend-down"}>{periodYears}년 상승폭 {listing.trendPct >= 0 ? "+" : ""}{listing.trendPct}%</span>}
           {listing.tags.map((tag) => <span key={tag}>{tag}</span>)}
         </div>
@@ -489,15 +489,17 @@ export default function Home() {
   const [sort, setSort] = useState("추천순");
   const [priceLimit, setPriceLimit] = useState(80000);
   const [onlyFit, setOnlyFit] = useState(true);
-  const [propertyType, setPropertyType] = useState<"all" | "apartment" | "villa">("apartment");
+  const [propertyTypes, setPropertyTypes] = useState<Array<"apartment" | "villa">>(["apartment"]);
   const [periodYears, setPeriodYears] = useState<1 | 3 | 5 | 10>(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
+  const [comparisonLoadTimedOut, setComparisonLoadTimedOut] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [region, setRegion] = useState<"seoul" | "gyeonggi">("seoul");
   const { data: districtMetadata } = trpc.realEstate.districts.useQuery({ region }, { staleTime: 60 * 60 * 1000 });
+  const requestedPropertyType = propertyTypes.length === 2 ? "all" : propertyTypes[0] ?? "apartment";
   const { data: tradeResponse, isLoading: tradesLoading, isError: tradesError } = trpc.realEstate.recentTrades.useQuery(
-    { region, months: 3, propertyType, periodYears },
+    { region, months: 1, propertyType: requestedPropertyType, periodYears },
     { staleTime: 10 * 60 * 1000, retry: 1 },
   );
 
@@ -566,6 +568,15 @@ export default function Home() {
   const selectedListings = useMemo(() => selectedIds
     .map((id) => listings.find((listing) => listing.id === id))
     .filter(Boolean) as Listing[], [listings, selectedIds]);
+  useEffect(() => {
+    if (!showComparison || selectedListings.length === 0) {
+      setComparisonLoadTimedOut(false);
+      return;
+    }
+    setComparisonLoadTimedOut(false);
+    const timer = window.setTimeout(() => setComparisonLoadTimedOut(true), 12_000);
+    return () => window.clearTimeout(timer);
+  }, [showComparison, selectedIds]);
   const comparisonAnchor = useMemo(() => selectedListings[0] ? { lat: selectedListings[0].lat, lng: selectedListings[0].lng } : { lat: 0, lng: 0 }, [selectedListings]);
   const kaptCandidates = useMemo(() => selectedListings.map((listing) => ({ id: listing.id, apartmentName: listing.name, lawdCd: listing.lawdCd ?? "", neighborhood: listing.neighborhood, jibun: listing.jibun, propertyType: listing.propertyType ?? "apartment" as const })), [selectedListings]);
   const { data: complexInfos, isLoading: complexInfoLoading } = trpc.realEstate.complexInfo.useQuery({ candidates: kaptCandidates }, {
@@ -579,7 +590,7 @@ export default function Home() {
     staleTime: 30 * 60 * 1000,
     retry: 0,
   });
-  const comparisonPropertyType = propertyType === "villa" ? "villa" : "apartment";
+  const comparisonPropertyType = propertyTypes.length === 1 && propertyTypes[0] === "villa" ? "villa" : "apartment";
   const { data: comparisonTrendSeries, isLoading: trendsLoading } = trpc.realEstate.trendSeries.useQuery({ region, propertyType: comparisonPropertyType }, {
     enabled: showComparison && selectedListings.length > 0,
     staleTime: 30 * 60 * 1000,
@@ -595,6 +606,13 @@ export default function Home() {
       }
       return [...current, id];
     });
+  };
+
+  const togglePropertyType = (type: "apartment" | "villa") => {
+    setPropertyTypes((current) => current.length === 1 && current[0] === type
+      ? current
+      : current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
+    setSelectedIds([]);
   };
 
   return (
@@ -698,7 +716,7 @@ export default function Home() {
           <div className="filter-toolbar">
             <div className="filter-main"><SlidersHorizontal size={17} /><span>FILTER BY</span></div>
             <label className="select-control"><span>지역</span><select value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setDistrictFilter("전체 구"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
-            <label className="select-control"><span>주택유형</span><select value={propertyType} onChange={(event) => { setPropertyType(event.target.value as "all" | "apartment" | "villa"); setSelectedIds([]); }}><option value="apartment">아파트 API</option><option value="villa">연립·다세대 API</option><option value="all">전체 API</option></select><ChevronDown size={14} /></label>
+            <div className="multi-select-control"><span>주택유형</span><label><input type="checkbox" checked={propertyTypes.includes("apartment")} onChange={() => togglePropertyType("apartment")} /> 아파트</label><label><input type="checkbox" checked={propertyTypes.includes("villa")} onChange={() => togglePropertyType("villa")} /> 빌라</label></div>
             <label className="select-control"><span>구·시</span><select value={districtFilter} onChange={(event) => setDistrictFilter(event.target.value)}><option>전체 구</option>{districtOptions.map((districtName) => <option key={districtName} value={districtName}>{districtName}</option>)}</select><ChevronDown size={14} /></label>
             <label className="select-control"><span>평형</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>전체 평형</option><option value="10평대">10평대</option><option value="20평대">20평대</option><option value="30평대">30평대</option><option value="40평대">40평대</option><option value="50평대 이상">50평대 이상</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>상승폭</span><select value={periodYears} onChange={(event) => setPeriodYears(Number(event.target.value) as 1 | 3 | 5 | 10)}><option value={1}>최근 1년</option><option value={3}>최근 3년</option><option value={5}>최근 5년</option><option value={10}>최근 10년</option></select><ChevronDown size={14} /></label>
@@ -708,7 +726,7 @@ export default function Home() {
           </div>
 
           <div className="data-source-banner is-live">
-            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyType === "villa" ? "연립·다세대" : propertyType === "apartment" ? "아파트 API(도시형 포함 가능)" : "주택 API"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeResponse?.month ?? "3개월"} 거래 · ${periodYears}년 전과 비교한 면적당 가격 변화`}</span></div></div>
+            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyTypes.length === 2 ? "아파트·빌라" : propertyTypes[0] === "villa" ? "빌라" : "아파트"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeResponse?.month ?? "1개월"} 거래 · 상승폭은 비교 리포트에서 확인할 수 있어요.`}</span></div></div>
             <span className="api-ready-pill"><BadgeCheck size={14} /> {tradesLoading ? "LOADING" : "LIVE DATA"}</span>
           </div>
 
@@ -758,16 +776,16 @@ export default function Home() {
             <div className="comparison-grid">
               {selectedListings.map((listing) => <div className="comparison-column" key={listing.id}>
                 <ListingVisual listing={listing} />
-                <div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district} · {listing.propertyType === "villa" ? "연립·다세대 API" : "아파트 API(도시형 포함 가능)"}</p></div>
+                <div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district} · {listing.propertyType === "villa" ? "빌라" : "아파트"}</p></div>
                 <div className="comparison-price"><span>최근 신고가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div>
                 <div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡ · {listing.areaBucket}</b></div><div><span>연식</span><b>{listing.year > 0 ? `${listing.builtAge}년차` : "정보 없음"}</b></div><div><span>교통 기준</span><b>{listing.station.split(" 도보")[0]}</b></div><div><span>추천점수</span><b className="score-text"><Star size={12} fill="currentColor" /> {listing.score}</b></div></div>
-                <div className="trend-report"><div className="comparison-subhead"><TrendingUp size={14} /> 기간별 상승폭 · 필터와 무관하게 전체 표시</div><div className="trend-report-grid">{([1, 3, 5, 10] as const).map((yearsAgo) => { const trend = comparisonTrendSeries?.[yearsAgo] ?? listing.trendPcts?.[yearsAgo]; return <div key={yearsAgo}><span>{yearsAgo}년</span><b className={(trend ?? 0) >= 0 ? "trend-up" : "trend-down"}>{trendsLoading ? "조회 중" : trend === undefined ? "데이터 없음" : `${trend >= 0 ? "+" : ""}${trend}%`}</b></div>; })}</div></div>
-                <div className="complex-data-panel"><div className="comparison-subhead"><Building2 size={14} /> 단지·관리 정보 <span className="kapt-source-badge">K-apt LIVE</span></div><div className="comparison-data-grid"><div><span>세대수</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.households ? `${complexInfoById.get(listing.id)!.households!.toLocaleString()}세대` : "매칭 정보 없음"}</b></div><div><span>동수 · 사용승인</span><b>{complexInfoLoading ? "조회 중" : `${complexInfoById.get(listing.id)?.buildingCount ? `${complexInfoById.get(listing.id)!.buildingCount}개동` : "동수 없음"} · ${complexInfoById.get(listing.id)?.approvalDate ?? "날짜 없음"}`}</b></div><div><span>총 주차대수</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.parkingTotal ? `${complexInfoById.get(listing.id)!.parkingTotal!.toLocaleString()}대` : "주차 정보 없음"}</b></div><div><span>세대당 주차</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.parkingPerHousehold ? `${complexInfoById.get(listing.id)!.parkingPerHousehold}대` : "계산 불가"}</b></div><div><span>용적률</span><b className={complexInfoById.get(listing.id)?.floorAreaRatio ? "" : "data-pending"}>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.floorAreaRatio ? `${complexInfoById.get(listing.id)!.floorAreaRatio}%` : "건축HUB 매칭 정보 없음"}</b></div><div><span>데이터 상태</span><b>{complexInfoById.get(listing.id)?.buildingDataStatusMessage ?? complexInfoById.get(listing.id)?.statusMessage ?? "K-apt 조회 대기"}</b></div></div></div>
-                <KaptSignalCards info={complexInfoById.get(listing.id)} loading={complexInfoLoading} />
+                <div className="trend-report"><div className="comparison-subhead"><TrendingUp size={14} /> 기간별 상승폭 · 필터와 무관하게 전체 표시</div><div className="trend-report-grid">{([1, 3, 5, 10] as const).map((yearsAgo) => { const trend = comparisonTrendSeries?.[yearsAgo] ?? listing.trendPcts?.[yearsAgo]; return <div key={yearsAgo}><span>{yearsAgo}년</span><b className={(trend ?? 0) >= 0 ? "trend-up" : "trend-down"}>{trendsLoading && !comparisonLoadTimedOut ? "조회 중" : trend === undefined ? "데이터 없음" : `${trend >= 0 ? "+" : ""}${trend}%`}</b></div>; })}</div></div>
+                <div className="complex-data-panel"><div className="comparison-subhead"><Building2 size={14} /> 단지·관리 정보 <span className="kapt-source-badge">단지 정보</span></div><div className="comparison-data-grid"><div><span>세대수</span><b>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : complexInfoById.get(listing.id)?.households ? `${complexInfoById.get(listing.id)!.households!.toLocaleString()}세대` : "매칭 정보 없음"}</b></div><div><span>동수 · 사용승인</span><b>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : `${complexInfoById.get(listing.id)?.buildingCount ? `${complexInfoById.get(listing.id)!.buildingCount}개동` : "동수 없음"} · ${complexInfoById.get(listing.id)?.approvalDate ?? "날짜 없음"}`}</b></div><div><span>총 주차대수</span><b>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : complexInfoById.get(listing.id)?.parkingTotal ? `${complexInfoById.get(listing.id)!.parkingTotal!.toLocaleString()}대` : "주차 정보 없음"}</b></div><div><span>세대당 주차</span><b>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : complexInfoById.get(listing.id)?.parkingPerHousehold ? `${complexInfoById.get(listing.id)!.parkingPerHousehold}대` : "계산 불가"}</b></div><div><span>용적률</span><b className={complexInfoById.get(listing.id)?.floorAreaRatio ? "" : "data-pending"}>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : complexInfoById.get(listing.id)?.floorAreaRatio ? `${complexInfoById.get(listing.id)!.floorAreaRatio}%` : "건축물대장 매칭 정보 없음"}</b></div><div><span>데이터 상태</span><b>{complexInfoById.get(listing.id)?.buildingDataStatusMessage ?? complexInfoById.get(listing.id)?.statusMessage ?? (comparisonLoadTimedOut ? "조회 시간 초과" : "단지 정보 조회 대기")}</b></div></div></div>
+                <KaptSignalCards info={complexInfoById.get(listing.id)} loading={complexInfoLoading && !comparisonLoadTimedOut} />
                 <div className="comparison-tags">{listing.tags.map((tag) => <span key={tag}><Check size={12} /> {tag}</span>)}</div>
               </div>)}
             </div>
-            <div className="location-report"><div><span className="section-kicker">LOCATION SIGNALS / 01</span><h3>첫 번째 선택 매물 주변 입지</h3><p>지도 좌표 기준 반경 1.2km의 Google 장소 데이터를 집계합니다.</p></div><div className="location-signal-grid">{nearbyLoading ? <span className="location-loading">상권·학군·교통 데이터를 불러오는 중이에요.</span> : nearbySignals?.map((signal) => <div className="location-signal" key={signal.category}><span>{signal.category}</span><strong>{signal.count}곳</strong><small>{signal.topPlaces.length ? signal.topPlaces.join(" · ") : "주요 장소 없음"}{signal.averageRating ? ` · 평균 ${signal.averageRating}점` : ""}</small></div>) ?? <span className="location-loading">주변 장소 데이터를 표시하려면 매물을 선택하세요.</span>}</div></div>
+            <div className="location-report"><div><span className="section-kicker">LOCATION SIGNALS / 01</span><h3>첫 번째 선택 매물 주변 입지</h3><p>지도 좌표 기준 반경 1.2km의 장소 데이터를 집계합니다.</p></div><div className="location-signal-grid">{nearbyLoading && !comparisonLoadTimedOut ? <span className="location-loading">상권·학군·교통 데이터를 불러오는 중이에요.</span> : nearbySignals?.map((signal) => <div className="location-signal" key={signal.category}><span>{signal.category}</span><strong>{signal.count}곳</strong><small>{signal.topPlaces.length ? signal.topPlaces.join(" · ") : "주요 장소 없음"}{signal.averageRating ? ` · 평균 ${signal.averageRating}점` : ""}</small></div>) ?? <span className="location-loading">{comparisonLoadTimedOut ? "입지 데이터 조회 시간이 초과됐어요." : "주변 장소 데이터를 표시하려면 매물을 선택하세요."}</span>}</div></div>
             <div className="comparison-dialog-foot"><span><BadgeCheck size={16} /> 국토교통부 신고 실거래 기준 · 현재 매물 여부는 별도 확인</span><button onClick={() => { setShowComparison(false); toast("비교 결과를 저장했어요", { description: "다음에 다시 이 화면에서 이어서 볼 수 있어요." }); }}>비교 결과 저장 <ArrowRight size={15} /></button></div>
           </div>
         </div>
