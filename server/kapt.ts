@@ -6,6 +6,8 @@ export const KAPT_BASIS_ENDPOINT = "https://apis.data.go.kr/1613000/AptBasisInfo
 
 type KaptItem = Record<string, string | number | null | undefined>;
 type KaptResponse = { response?: { header?: { resultCode?: string; resultMsg?: string }; body?: { items?: KaptItem | KaptItem[] | { item?: KaptItem | KaptItem[] }; item?: KaptItem | KaptItem[] } } };
+const kaptResponseCache = new Map<string, { expiresAt: number; payload: KaptResponse }>();
+const KAPT_CACHE_MS = 60 * 60 * 1000;
 
 type KaptCandidate = {
   id: string;
@@ -67,13 +69,17 @@ async function requestKapt<T extends KaptResponse>(base: string, path: string, s
   url.searchParams.set("serviceKey", decodeURIComponent(serviceKey));
   url.searchParams.set("_type", "json");
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-  const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  const cacheKey = url.toString();
+  const cached = kaptResponseCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.payload as T;
+  const response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
   const raw = await response.text();
   if (!response.ok) throw new Error(`K-apt request failed: ${response.status}`);
   let payload: T;
   try { payload = JSON.parse(raw) as T; } catch { throw new Error("K-apt returned a non-JSON response"); }
   const header = payload.response?.header;
   if (header?.resultCode && !["00", "000"].includes(header.resultCode)) throw new Error(`K-apt API ${header.resultCode}: ${header.resultMsg ?? "unknown"}`);
+  kaptResponseCache.set(cacheKey, { expiresAt: Date.now() + KAPT_CACHE_MS, payload });
   return payload;
 }
 

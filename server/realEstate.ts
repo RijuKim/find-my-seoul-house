@@ -100,7 +100,7 @@ export async function fetchMolitAptTrades({ lawdCd, dealYmd, numOfRows = 100, di
 export type PropertyTypeFilter = "all" | "apartment" | "villa";
 const regionCache = new Map<string, { expiresAt: number; data: MolitAptTrade[]; month: string; region: RegionKey; propertyType: PropertyTypeFilter; periodYears: number; sourceWarning?: string }>();
 export async function fetchRecentAptTrades({ region = "seoul", months = 1, perDistrict = 20, limit = 240, propertyType = "all", periodYears = 1, includeTrend = false }: { region?: RegionKey; months?: number; perDistrict?: number; limit?: number; propertyType?: PropertyTypeFilter; periodYears?: 1 | 3 | 5 | 10; includeTrend?: boolean } = {}) {
-  const cacheKey = `v3:${region}:${propertyType}:${periodYears}:${includeTrend}`; const cached = regionCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) return cached;
+  const cacheKey = `v4:${region}:${propertyType}:${periodYears}:${months}:${perDistrict}:${limit}:${includeTrend}`; const cached = regionCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) return cached;
   const districts = REGION_DISTRICTS[region]; const types = propertyType === "all" ? ["apartment", "villa"] as const : [propertyType]; let data: MolitAptTrade[] = []; let latestMonth = getSeoulTradeMonth(new Date(), 1); let requestFailures = 0;
   for (let monthsAgo = 1; monthsAgo <= months && data.length < limit; monthsAgo += 1) {
     const dealYmd = getSeoulTradeMonth(new Date(), monthsAgo);
@@ -127,12 +127,34 @@ export async function fetchRecentAptTrades({ region = "seoul", months = 1, perDi
 }
 
 export async function fetchTrendSeries({ region = "seoul", propertyType = "apartment" }: { region?: RegionKey; propertyType?: Exclude<PropertyTypeFilter, "all"> } = {}) {
+  // A comparison report does not need every district. Sampling five representative
+  // districts cuts this from roughly 200 external calls to 40, while retaining a
+  // useful Seoul/Gyeonggi-wide price-per-㎡ signal.
+  const sampleCodes = region === "seoul"
+    ? ["11680", "11440", "11560", "11380", "11650"]
+    : ["41135", "41117", "41285", "41463", "41590"];
+  const yearsList = [1, 3, 5, 10] as const;
+  const tasks = yearsList.flatMap((years) => sampleCodes.flatMap((lawdCd) => [
+    () => fetchMolitAptTrades({ lawdCd, dealYmd: getSeoulTradeMonth(new Date(), 1), numOfRows: 100, districts: REGION_DISTRICTS[region], propertyType }),
+    () => fetchMolitAptTrades({ lawdCd, dealYmd: getSeoulTradeMonth(new Date(), years * 12 + 1), numOfRows: 100, districts: REGION_DISTRICTS[region], propertyType }),
+  ]));
+  const settled = await settleInBatches(tasks, 8);
+  const averagePsm = (rows: MolitAptTrade[]) => rows.length ? rows.reduce((sum, trade) => sum + trade.priceMan / trade.area, 0) / rows.length : 0;
   const series: Partial<Record<1 | 3 | 5 | 10, number>> = {};
-  for (const years of [1, 3, 5, 10] as const) {
-    const result = await fetchRecentAptTrades({ region, propertyType, periodYears: years, months: 1, perDistrict: 8, limit: 80, includeTrend: true });
-    const trend = result.data[0]?.trendPct;
-    if (trend !== undefined) series[years] = trend;
-  }
+  yearsList.forEach((years, yearIndex) => {
+    const current: MolitAptTrade[] = [];
+    const baseline: MolitAptTrade[] = [];
+    for (let districtIndex = 0; districtIndex < sampleCodes.length; districtIndex += 1) {
+      const offset = (yearIndex * sampleCodes.length + districtIndex) * 2;
+      const currentResult = settled[offset];
+      const baselineResult = settled[offset + 1];
+      if (currentResult?.status === "fulfilled") current.push(...currentResult.value);
+      if (baselineResult?.status === "fulfilled") baseline.push(...baselineResult.value);
+    }
+    const currentPsm = averagePsm(current);
+    const baselinePsm = averagePsm(baseline);
+    if (baselinePsm > 0) series[years] = Math.round(((currentPsm - baselinePsm) / baselinePsm) * 1000) / 10;
+  });
   return series;
 }
 

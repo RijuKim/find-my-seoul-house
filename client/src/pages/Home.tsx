@@ -498,8 +498,9 @@ export default function Home() {
   const [region, setRegion] = useState<"seoul" | "gyeonggi">("seoul");
   const { data: districtMetadata } = trpc.realEstate.districts.useQuery({ region }, { staleTime: 60 * 60 * 1000 });
   const requestedPropertyType = propertyTypes.length === 2 ? "all" : propertyTypes[0] ?? "apartment";
+  const tradeMonths = requestedPropertyType === "apartment" ? 6 : 12;
   const { data: tradeResponse, isLoading: tradesLoading, isError: tradesError } = trpc.realEstate.recentTrades.useQuery(
-    { region, months: 1, propertyType: requestedPropertyType, periodYears },
+    { region, months: tradeMonths, propertyType: requestedPropertyType, periodYears },
     { staleTime: 10 * 60 * 1000, retry: 1 },
   );
 
@@ -716,7 +717,7 @@ export default function Home() {
           <div className="filter-toolbar">
             <div className="filter-main"><SlidersHorizontal size={17} /><span>FILTER BY</span></div>
             <label className="select-control"><span>지역</span><select value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setDistrictFilter("전체 구"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
-            <div className="multi-select-control"><span>주택유형</span><label><input type="checkbox" checked={propertyTypes.includes("apartment")} onChange={() => togglePropertyType("apartment")} /> 아파트</label><label><input type="checkbox" checked={propertyTypes.includes("villa")} onChange={() => togglePropertyType("villa")} /> 빌라</label></div>
+            <div className="multi-select-control"><span>주택유형</span><label><input type="checkbox" checked={propertyTypes.includes("apartment")} onChange={() => togglePropertyType("apartment")} /> 아파트</label><label><input type="checkbox" checked={propertyTypes.includes("villa")} onChange={() => togglePropertyType("villa")} /> 빌라·다세대</label></div>
             <label className="select-control"><span>구·시</span><select value={districtFilter} onChange={(event) => setDistrictFilter(event.target.value)}><option>전체 구</option>{districtOptions.map((districtName) => <option key={districtName} value={districtName}>{districtName}</option>)}</select><ChevronDown size={14} /></label>
             <label className="select-control"><span>평형</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>전체 평형</option><option value="10평대">10평대</option><option value="20평대">20평대</option><option value="30평대">30평대</option><option value="40평대">40평대</option><option value="50평대 이상">50평대 이상</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>상승폭</span><select value={periodYears} onChange={(event) => setPeriodYears(Number(event.target.value) as 1 | 3 | 5 | 10)}><option value={1}>최근 1년</option><option value={3}>최근 3년</option><option value={5}>최근 5년</option><option value={10}>최근 10년</option></select><ChevronDown size={14} /></label>
@@ -726,7 +727,7 @@ export default function Home() {
           </div>
 
           <div className="data-source-banner is-live">
-            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyTypes.length === 2 ? "아파트·빌라" : propertyTypes[0] === "villa" ? "빌라" : "아파트"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeResponse?.month ?? "1개월"} 거래 · 상승폭은 비교 리포트에서 확인할 수 있어요.`}</span></div></div>
+            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyTypes.length === 2 ? "아파트·빌라·다세대" : propertyTypes[0] === "villa" ? "빌라·다세대" : "아파트"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeMonths}개월 중 확인 가능한 거래 · 상승폭은 비교 리포트에서 확인할 수 있어요.`}</span></div></div>
             <span className="api-ready-pill"><BadgeCheck size={14} /> {tradesLoading ? "LOADING" : "LIVE DATA"}</span>
           </div>
 
