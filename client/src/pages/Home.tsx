@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MapView } from "@/components/Map";
+import { trpc } from "@/lib/trpc";
 import {
   ArrowDownUp,
   ArrowRight,
@@ -51,7 +52,7 @@ type Listing = {
   note: string;
 };
 
-const listings: Listing[] = [
+const sampleListings: Listing[] = [
   {
     id: "gwangjin",
     name: "광장힐스테이트",
@@ -431,6 +432,11 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [region, setRegion] = useState<"seoul" | "gyeonggi">("seoul");
+  const { data: tradeResponse, isLoading: tradesLoading, isError: tradesError } = trpc.realEstate.recentTrades.useQuery(
+    { region, months: 3 },
+    { staleTime: 10 * 60 * 1000, retry: 1 },
+  );
 
   const budget = useMemo(() => {
     const repaymentLoan = getLoanByPayment(monthly, years, rate);
@@ -443,6 +449,30 @@ export default function Home() {
       ltvCapPrice,
     };
   }, [savings, monthly, years, rate, ltv]);
+
+  const listings = useMemo<Listing[]>(() => {
+    if (!tradeResponse?.data?.length) return [];
+    const gradients = ["from-[#97bbc8] via-[#dfe9e4] to-[#f5d9a8]", "from-[#b2c8db] via-[#eef1e7] to-[#e2bc9d]", "from-[#b8d5cb] via-[#f4e6c5] to-[#c3a889]", "from-[#c2d8e0] via-[#f3ebd3] to-[#d5ae92]"];
+    return tradeResponse.data.map((trade, index) => ({
+      id: trade.id,
+      name: trade.apartmentName,
+      district: `${trade.district} ${trade.neighborhood}`,
+      cluster: trade.cluster,
+      lat: trade.lat,
+      lng: trade.lng,
+      price: trade.priceMan,
+      area: trade.area,
+      floor: trade.floor ? `${trade.floor}층` : "층 정보 없음",
+      year: trade.year,
+      station: trade.roadName ? `${trade.roadName} 일대` : "주소 정보 확인",
+      commute: `계약일 ${trade.dealDate}`,
+      tags: ["국토부 실거래", `${trade.area}㎡`],
+      visual: gradients[index % gradients.length],
+      accent: "#d2f36b",
+      score: Math.max(60, Math.min(99, 92 - Math.round(Math.abs(trade.priceMan - budget.total) / Math.max(1, budget.total) * 30))),
+      note: "국토교통부 신고 실거래",
+    }));
+  }, [budget.total, tradeResponse]);
 
   const filteredListings = useMemo(() => {
     const next = listings.filter((listing) => {
@@ -501,7 +531,7 @@ export default function Home() {
             <p className="hero-description">대출 상환액과 보유 자금을 입력하면<br className="desktop-only" /> 지금 살펴볼 수 있는 아파트를 한눈에 보여드려요.</p>
             <div className="hero-trust-row">
               <span><ShieldCheck size={15} /> 내 정보는 브라우저에만 저장돼요</span>
-              <span><Sparkles size={15} /> 실거래 API 연동 준비</span>
+              <span><Sparkles size={15} /> 국토부 실거래 LIVE</span>
             </div>
           </div>
 
@@ -566,24 +596,25 @@ export default function Home() {
           <div className="section-heading listings-heading">
             <div>
               <span className="section-kicker">02 / MATCHED LISTINGS</span>
-              <h2>지금 예산으로 볼 수 있는 집</h2>
-              <p className="heading-sub"><span className="live-dot" /> 예산 {formatPrice(budget.total)} 안에서 <strong>{filteredListings.length}개 매물</strong>을 찾았어요.</p>
+              <h2>지금 예산으로 확인할 수 있는 실거래</h2>
+              <p className="heading-sub"><span className="live-dot" /> {region === "seoul" ? "서울" : "경기"} 최근 실거래 기준 · 예산 {formatPrice(budget.total)} 안에서 <strong>{filteredListings.length}개 거래</strong>를 찾았어요.</p>
             </div>
             <button className="save-search-button" onClick={() => toast("검색 조건을 저장했어요", { description: "새로운 매물이 들어오면 이 조건으로 다시 찾아볼게요." })}><Bell size={15} /> 이 조건 저장</button>
           </div>
 
           <div className="filter-toolbar">
             <div className="filter-main"><SlidersHorizontal size={17} /><span>FILTER BY</span></div>
-            <label className="select-control"><span>생활권</span><select value={cluster} onChange={(event) => setCluster(event.target.value)}><option>전체 생활권</option><option>한강권</option><option>강남권</option><option>동남권</option><option>서남권</option><option>서북권</option><option>북부권</option></select><ChevronDown size={14} /></label>
+            <label className="select-control"><span>지역</span><select value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setCluster("전체 생활권"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
+            <label className="select-control"><span>생활권</span><select value={cluster} onChange={(event) => setCluster(event.target.value)}><option>전체 생활권</option><option>한강권</option><option>강남권</option><option>동남권</option><option>서남권</option><option>서북권</option><option>북부권</option><option>도심권</option><option>동북권</option><option>경기남부</option><option>경기북부</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>평형</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>전체 평형</option><option value="49">49㎡대</option><option value="59">59㎡대</option></select><ChevronDown size={14} /></label>
             <label className="select-control price-select"><span>최대 가격</span><select value={priceLimit} onChange={(event) => setPriceLimit(Number(event.target.value))}><option value={60000}>6억</option><option value={70000}>7억</option><option value={80000}>8억</option><option value={100000}>10억</option><option value={200000}>20억</option></select><ChevronDown size={14} /></label>
             <button className={`fit-toggle ${onlyFit ? "is-on" : ""}`} onClick={() => setOnlyFit((current) => !current)}><span className="toggle-dot" /> 예산 안에만</button>
             <label className="sort-control"><ArrowDownUp size={15} /><select value={sort} onChange={(event) => setSort(event.target.value)}><option>추천순</option><option>낮은 가격순</option><option>넓은 평형순</option></select><ChevronDown size={14} /></label>
           </div>
 
-          <div className="data-source-banner">
-            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>현재는 화면 검증용 샘플 매물이에요.</strong><span>국토교통부 실거래 API를 연결하면 서울 구·월별 거래를 이 지도와 목록에 자동으로 채울 수 있어요.</span></div></div>
-            <span className="api-ready-pill"><BadgeCheck size={14} /> API 연결 구조 준비</span>
+          <div className="data-source-banner is-live">
+            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} 실제 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : `최근 ${tradeResponse?.month ?? "3개월"} 거래 · 국토교통부 아파트 매매 실거래가 자료`}</span></div></div>
+            <span className="api-ready-pill"><BadgeCheck size={14} /> {tradesLoading ? "LOADING" : "LIVE DATA"}</span>
           </div>
 
           <MapPanel
@@ -594,13 +625,15 @@ export default function Home() {
           />
 
           <div className="listings-content">
-            <div className="listings-summary"><span><strong>{filteredListings.length}</strong> RESULTS</span><span className="summary-line" /><span>매매 / 서울 / {formatPrice(Math.min(priceLimit, budget.total))} 이하</span></div>
-            {filteredListings.length > 0 ? (
+            <div className="listings-summary"><span><strong>{filteredListings.length}</strong> RESULTS</span><span className="summary-line" /><span>국토부 신고 매매 / {region === "seoul" ? "서울" : "경기"} / {formatPrice(Math.min(priceLimit, budget.total))} 이하</span></div>
+            {tradesLoading ? (
+              <div className="empty-state loading-state"><CircleDollarSign size={24} /><h3>실거래 데이터를 불러오는 중이에요.</h3><p>서울 25개 구의 최근 신고 내역을 확인하고 있어요.</p></div>
+            ) : filteredListings.length > 0 ? (
               <div className="listing-grid">
                 {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} selected={selectedIds.includes(listing.id)} onSelect={() => toggleCompare(listing.id)} /></div>)}
               </div>
             ) : (
-              <div className="empty-state"><Search size={24} /><h3>조건에 맞는 매물이 없어요.</h3><p>생활권이나 최대 가격 필터를 조금 넓혀보세요.</p><button onClick={() => { setCluster("전체 생활권"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(100000); }}>필터 초기화 <ArrowRight size={15} /></button></div>
+              <div className="empty-state"><Search size={24} /><h3>{tradesError ? "실거래 데이터를 불러오지 못했어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError ? "잠시 후 다시 시도해 주세요." : "생활권이나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { setCluster("전체 생활권"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>필터 초기화 <ArrowRight size={15} /></button></div>
             )}
           </div>
         </section>
@@ -614,7 +647,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="site-footer container"><div className="footer-brand"><span className="brand-mark"><HomeIcon size={15} /></span><span>예산에 맞는 집</span></div><span>서울 아파트 탐색을 위한 개인용 프로토타입</span><span>실제 매물·대출 조건과 다를 수 있어요.</span></footer>
+      <footer className="site-footer container"><div className="footer-brand"><span className="brand-mark"><HomeIcon size={15} /></span><span>예산에 맞는 집</span></div><span>국토교통부 신고 실거래 기반 탐색</span><span>신고 거래는 현재 판매 중인 매물과 다를 수 있어요.</span></footer>
 
       {selectedListings.length > 0 && !showComparison && (
         <div className="compare-tray" id="compare-tray">
@@ -630,7 +663,7 @@ export default function Home() {
             <div className="comparison-grid">
               {selectedListings.map((listing) => <div className="comparison-column" key={listing.id}><ListingVisual listing={listing} /><div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district}</p></div><div className="comparison-price"><span>매매가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div><div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡</b></div><div><span>입주연도</span><b>{listing.year}년</b></div><div><span>역까지</span><b>{listing.station.split(" 도보")[0]}</b></div><div><span>추천점수</span><b className="score-text"><Star size={12} fill="currentColor" /> {listing.score}</b></div></div><div className="comparison-tags">{listing.tags.map((tag) => <span key={tag}><Check size={12} /> {tag}</span>)}</div></div>)}
             </div>
-            <div className="comparison-dialog-foot"><span><BadgeCheck size={16} /> 매물 정보는 탐색용 샘플 데이터입니다.</span><button onClick={() => { setShowComparison(false); toast("비교 결과를 저장했어요", { description: "다음에 다시 이 화면에서 이어서 볼 수 있어요." }); }}>비교 결과 저장 <ArrowRight size={15} /></button></div>
+            <div className="comparison-dialog-foot"><span><BadgeCheck size={16} /> 국토교통부 신고 실거래 기준 · 현재 매물 여부는 별도 확인</span><button onClick={() => { setShowComparison(false); toast("비교 결과를 저장했어요", { description: "다음에 다시 이 화면에서 이어서 볼 수 있어요." }); }}>비교 결과 저장 <ArrowRight size={15} /></button></div>
           </div>
         </div>
       )}
