@@ -1,4 +1,5 @@
 import { ENV } from "./_core/env";
+import { fetchBuildingHubRecap } from "./buildingHub";
 
 export const KAPT_LIST_ENDPOINT = "https://apis.data.go.kr/1613000/AptListService4";
 export const KAPT_BASIS_ENDPOINT = "https://apis.data.go.kr/1613000/AptBasisInfoServiceV5";
@@ -19,6 +20,7 @@ export type KaptComplexInfo = {
   id: string;
   kaptCode?: string;
   kaptName?: string;
+  bjdCode?: string;
   status: "matched" | "not_found" | "unsupported" | "unavailable" | "error";
   statusMessage: string;
   households?: number;
@@ -36,6 +38,10 @@ export type KaptComplexInfo = {
   busDistance?: string;
   convenienceFacilities?: string;
   educationFacilities?: string;
+  floorAreaRatio?: number;
+  landArea?: number;
+  grossArea?: number;
+  buildingDataStatusMessage?: string;
   source: "K-apt" | "none";
 };
 
@@ -104,6 +110,14 @@ export async function fetchKaptComplexInfo(candidates: KaptCandidate[]): Promise
       ]);
       const basic = (asArray(basicResponse.response?.body?.item ?? basicResponse.response?.body?.items)[0] ?? {}) as KaptItem;
       const detail = (asArray(detailResponse.response?.body?.item ?? detailResponse.response?.body?.items)[0] ?? {}) as KaptItem;
+      const bjdCode = text(matched.bjdCode);
+      const [candidateBun, candidateJi = "0000"] = text(candidate.jibun).split(/[-–—]/).map((part) => part.trim());
+      const buildingRecap = await fetchBuildingHubRecap({
+        sigunguCd: candidate.lawdCd,
+        bjdongCd: bjdCode.length >= 10 ? bjdCode.slice(5) : "",
+        bun: candidateBun ?? "",
+        ji: candidateJi || "0000",
+      });
       const households = number(basic.kaptdaCnt);
       const parkingGround = number(detail.kaptdPcnt);
       const parkingUnderground = number(detail.kaptdPcntu);
@@ -112,6 +126,7 @@ export async function fetchKaptComplexInfo(candidates: KaptCandidate[]): Promise
         id: candidate.id,
         kaptCode,
         kaptName: text(basic.kaptName ?? matched.kaptName),
+        bjdCode: bjdCode || undefined,
         status: "matched",
         statusMessage: "K-apt 단지코드와 매칭된 공식 정보입니다.",
         households,
@@ -129,6 +144,10 @@ export async function fetchKaptComplexInfo(candidates: KaptCandidate[]): Promise
         busDistance: text(detail.kaptdWtimebus) || undefined,
         convenienceFacilities: text(detail.convenientFacility) || undefined,
         educationFacilities: text(detail.educationFacility) || undefined,
+        floorAreaRatio: buildingRecap.floorAreaRatio,
+        landArea: buildingRecap.landArea,
+        grossArea: buildingRecap.grossArea,
+        buildingDataStatusMessage: buildingRecap.statusMessage,
         source: "K-apt",
       };
     } catch (error) {

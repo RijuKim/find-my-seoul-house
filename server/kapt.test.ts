@@ -16,4 +16,18 @@ describe("K-apt complex info", () => {
     expect(info?.parkingTotal).toBeGreaterThan(0);
     expect(info?.source).toBe("K-apt");
   }, 45_000);
+
+  it("joins a K-apt complex to BuildingHUB FAR by parcel", async () => {
+    const [info] = await fetchKaptComplexInfo([{
+      id: "kapt-far-test",
+      apartmentName: "개포자이",
+      lawdCd: "11680",
+      neighborhood: "개포동",
+      jibun: "12-2",
+      propertyType: "apartment",
+    }]);
+    expect(info?.status).toBe("matched");
+    expect(info?.floorAreaRatio).toBeGreaterThan(0);
+    expect(info?.buildingDataStatusMessage).toContain("공식 용적률");
+  }, 60_000);
 });

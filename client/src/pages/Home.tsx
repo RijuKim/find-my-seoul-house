@@ -430,6 +430,53 @@ function MapPanel({
   );
 }
 
+type KaptSignalInfo = {
+  subwayStation?: string;
+  subwayLine?: string;
+  subwayDistance?: string;
+  busDistance?: string;
+  convenienceFacilities?: string;
+  educationFacilities?: string;
+};
+
+function KaptSignalCards({ info, loading }: { info?: KaptSignalInfo; loading: boolean }) {
+  const cards = [
+    {
+      label: "교통",
+      icon: <TrainFront size={15} />,
+      value: info?.subwayStation ? `${info.subwayLine ? `${info.subwayLine} ` : ""}${info.subwayStation}` : "정보 없음",
+      detail: info?.subwayDistance || info?.busDistance ? `지하철 ${info.subwayDistance ?? "거리 확인"} · 버스 ${info.busDistance ?? "거리 확인"}` : "K-apt 교통시설 정보 기준",
+    },
+    {
+      label: "학군",
+      icon: <BadgeCheck size={15} />,
+      value: info?.educationFacilities || "정보 없음",
+      detail: "K-apt 교육시설 정보 기준",
+    },
+    {
+      label: "편의시설",
+      icon: <LayoutGrid size={15} />,
+      value: info?.convenienceFacilities || "정보 없음",
+      detail: "K-apt 단지 편의시설 정보 기준",
+    },
+  ];
+
+  return (
+    <div className="kapt-signal-panel">
+      <div className="comparison-subhead"><Sparkles size={14} /> 생활 인프라 <span className="kapt-source-badge">K-apt LIVE</span></div>
+      <div className="kapt-signal-grid">
+        {cards.map((card) => (
+          <div className="kapt-signal-card" key={card.label}>
+            <div className="kapt-signal-card-head">{card.icon}<span>{card.label}</span></div>
+            <strong>{loading ? "조회 중" : card.value}</strong>
+            <small>{loading ? "공식 단지정보를 불러오는 중" : card.detail}</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [savings, setSavings] = useState(24000);
   const [monthly, setMonthly] = useState(380);
@@ -710,7 +757,8 @@ export default function Home() {
                 <div className="comparison-price"><span>최근 신고가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div>
                 <div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡ · {listing.areaBucket}</b></div><div><span>연식</span><b>{listing.year > 0 ? `${listing.builtAge}년차` : "정보 없음"}</b></div><div><span>교통 기준</span><b>{listing.station.split(" 도보")[0]}</b></div><div><span>추천점수</span><b className="score-text"><Star size={12} fill="currentColor" /> {listing.score}</b></div></div>
                 <div className="trend-report"><div className="comparison-subhead"><TrendingUp size={14} /> 기간별 상승폭 · 필터와 무관하게 전체 표시</div><div className="trend-report-grid">{([1, 3, 5, 10] as const).map((yearsAgo) => { const trend = comparisonTrendSeries?.[yearsAgo] ?? listing.trendPcts?.[yearsAgo]; return <div key={yearsAgo}><span>{yearsAgo}년</span><b className={(trend ?? 0) >= 0 ? "trend-up" : "trend-down"}>{trendsLoading ? "조회 중" : trend === undefined ? "데이터 없음" : `${trend >= 0 ? "+" : ""}${trend}%`}</b></div>; })}</div></div>
-                <div className="complex-data-panel"><div className="comparison-subhead"><Building2 size={14} /> 단지·관리 정보 <span className="kapt-source-badge">K-apt LIVE</span></div><div className="comparison-data-grid"><div><span>세대수</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.households ? `${complexInfoById.get(listing.id)!.households!.toLocaleString()}세대` : "매칭 정보 없음"}</b></div><div><span>동수 · 사용승인</span><b>{complexInfoLoading ? "조회 중" : `${complexInfoById.get(listing.id)?.buildingCount ? `${complexInfoById.get(listing.id)!.buildingCount}개동` : "동수 없음"} · ${complexInfoById.get(listing.id)?.approvalDate ?? "날짜 없음"}`}</b></div><div><span>총 주차대수</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.parkingTotal ? `${complexInfoById.get(listing.id)!.parkingTotal!.toLocaleString()}대` : "주차 정보 없음"}</b></div><div><span>세대당 주차</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.parkingPerHousehold ? `${complexInfoById.get(listing.id)!.parkingPerHousehold}대` : "계산 불가"}</b></div><div><span>용적률</span><b className="data-pending">건축물대장 API 연결 필요</b></div><div><span>데이터 상태</span><b>{complexInfoById.get(listing.id)?.statusMessage ?? "K-apt 조회 대기"}</b></div></div></div>
+                <div className="complex-data-panel"><div className="comparison-subhead"><Building2 size={14} /> 단지·관리 정보 <span className="kapt-source-badge">K-apt LIVE</span></div><div className="comparison-data-grid"><div><span>세대수</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.households ? `${complexInfoById.get(listing.id)!.households!.toLocaleString()}세대` : "매칭 정보 없음"}</b></div><div><span>동수 · 사용승인</span><b>{complexInfoLoading ? "조회 중" : `${complexInfoById.get(listing.id)?.buildingCount ? `${complexInfoById.get(listing.id)!.buildingCount}개동` : "동수 없음"} · ${complexInfoById.get(listing.id)?.approvalDate ?? "날짜 없음"}`}</b></div><div><span>총 주차대수</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.parkingTotal ? `${complexInfoById.get(listing.id)!.parkingTotal!.toLocaleString()}대` : "주차 정보 없음"}</b></div><div><span>세대당 주차</span><b>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.parkingPerHousehold ? `${complexInfoById.get(listing.id)!.parkingPerHousehold}대` : "계산 불가"}</b></div><div><span>용적률</span><b className={complexInfoById.get(listing.id)?.floorAreaRatio ? "" : "data-pending"}>{complexInfoLoading ? "조회 중" : complexInfoById.get(listing.id)?.floorAreaRatio ? `${complexInfoById.get(listing.id)!.floorAreaRatio}%` : "건축HUB 매칭 정보 없음"}</b></div><div><span>데이터 상태</span><b>{complexInfoById.get(listing.id)?.buildingDataStatusMessage ?? complexInfoById.get(listing.id)?.statusMessage ?? "K-apt 조회 대기"}</b></div></div></div>
+                <KaptSignalCards info={complexInfoById.get(listing.id)} loading={complexInfoLoading} />
                 <div className="comparison-tags">{listing.tags.map((tag) => <span key={tag}><Check size={12} /> {tag}</span>)}</div>
               </div>)}
             </div>
