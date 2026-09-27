@@ -387,6 +387,10 @@ function MapPanel({
     markersRef.current.forEach((marker) => { marker.map = null; });
   }, []);
 
+  useEffect(() => {
+    if (mapRef.current) drawMarkers(mapRef.current);
+  }, [visibleListings, selectedIds]);
+
   return (
     <div className="map-panel">
       <div className="map-panel-header">
@@ -398,7 +402,6 @@ function MapPanel({
       </div>
       <div className="map-stage">
         <MapView
-          key={visibleListings.map((listing) => listing.id).join("-") || "empty"}
           className="listing-map"
           initialCenter={{ lat: 37.552, lng: 126.99 }}
           initialZoom={11}
@@ -584,7 +587,6 @@ export default function Home() {
           </div>
 
           <MapPanel
-            key={`${cluster}-${area}-${priceLimit}-${onlyFit}-${sort}-${filteredListings.map((listing) => listing.id).join("-")}`}
             listings={filteredListings}
             budgetTotal={budget.total}
             selectedIds={selectedIds}
