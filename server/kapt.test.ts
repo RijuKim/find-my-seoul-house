@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import { fetchKaptComplexInfo } from "./kapt";
+
+const hasKaptKeys = Boolean(process.env.KAPT_LIST_SERVICE_KEY && process.env.KAPT_BASIS_SERVICE_KEY);
+
+describe("K-apt complex info", () => {
+  it.skipIf(!hasKaptKeys)("matches a Seoul apartment and returns official household and parking fields", async () => {
+    const [info] = await fetchKaptComplexInfo([{
+      id: "kapt-test",
+      apartmentName: "경희궁의아침4단지",
+      lawdCd: "11110",
+      neighborhood: "내수동",
+      propertyType: "apartment",
+    }]);
+    expect(info?.status).toBe("matched");
+    expect(info?.kaptCode).toBeTruthy();
+    expect(info?.households).toBeGreaterThan(0);
+    expect(info?.parkingTotal).toBeGreaterThan(0);
+    expect(info?.source).toBe("K-apt");
+  }, 45_000);
+
+  it.skipIf(!hasKaptKeys)("joins a K-apt complex to BuildingHUB FAR by parcel", async () => {
+    const [info] = await fetchKaptComplexInfo([{
+      id: "kapt-far-test",
+      apartmentName: "개포자이",
+      lawdCd: "11680",
+      neighborhood: "개포동",
+      jibun: "12-2",
+      propertyType: "apartment",
+    }]);
+    expect(info?.status).toBe("matched");
+    expect(info?.floorAreaRatio).toBeGreaterThan(0);
+    expect(info?.buildingDataStatusMessage).toContain("공식 용적률");
+  }, 60_000);
+});
