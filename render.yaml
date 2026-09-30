@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: budungbudung
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
+    startCommand: pnpm run start
+    healthCheckPath: /api/trpc/system.health?input=%7B%22json%22%3A%7B%22timestamp%22%3A1%7D%7D
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: MOLIT_SERVICE_KEY
+        sync: false
+      - key: KAPT_LIST_SERVICE_KEY
+        sync: false
+      - key: KAPT_BASIS_SERVICE_KEY
+        sync: false
+      - key: BUILDING_HUB_SERVICE_KEY
+        sync: false
+      - key: KAKAO_REST_API_KEY
+        sync: false
+      - key: VITE_NAVER_MAPS_CLIENT_ID
+        sync: false
