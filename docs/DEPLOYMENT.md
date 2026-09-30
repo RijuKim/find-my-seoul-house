@@ -47,16 +47,16 @@ PORT=3000
 
 로그인이 없는 공개 탐색 도구이므로 인증·데이터베이스 환경변수는 필요하지 않습니다.
 
-### 네이버 지도 (지도·상권 신호)
+### 카카오 지도 (지도·상권 신호)
 
 ```env
-VITE_NAVER_MAPS_CLIENT_ID=NCP_Maps_ncpKeyId
+VITE_KAKAO_MAPS_JS_KEY=카카오_JavaScript_키
 KAKAO_REST_API_KEY=카카오_REST_API_키
 ```
 
-- `MapView`는 브라우저에서 `VITE_NAVER_MAPS_CLIENT_ID`(NCP Maps의 `ncpKeyId`)로 Naver 지도 JS v3를 로드합니다. NCP 콘솔에서 **Web 서비스 URL**에 배포 도메인을 등록해야 합니다.
+- `MapView`는 브라우저에서 `VITE_KAKAO_MAPS_JS_KEY`(JavaScript 키)로 Kakao 지도 SDK를 로드합니다. developers.kakao.com > 앱 > 플랫폼 키 > JavaScript SDK 도메인에 배포 도메인을 등록해야 합니다.
 - 상권·학군·교통 신호(`server/places.ts`)는 서버에서 카카오 로컬 API를 `KAKAO_REST_API_KEY`로 호출합니다. 지도 좌표 기준 반경 1.2km의 대형마트·학교·지하철역을 거리순으로 집계합니다.
-- 자체 지도 JS 경로를 쓸 경우 `VITE_NAVER_MAPS_JS_URL`로 base URL을 바꿀 수 있습니다.
+- 자체 지도 SDK 경로를 쓸 경우 `VITE_KAKAO_MAPS_JS_URL`로 base URL을 바꿀 수 있습니다.
 
 ## 4. 일반적인 Node 호스팅 배포
 

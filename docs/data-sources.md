@@ -10,9 +10,9 @@
 
 ## 지도·입지
 
-- Naver Maps JS API v3 (NCP): `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={클라이언트ID}`
-  - 발급: NAVER Cloud Platform > Maps. 브라우저에 노출되는 클라이언트 ID만 사용하며 Web 서비스 URL을 등록한다.
-  - 지도 초기화·마커·경계 맞춤은 `client/src/components/Map.tsx`, `client/src/pages/Home.tsx`의 `MapPanel`.
+- Kakao Maps JS SDK: `https://dapi.kakao.com/v2/maps/sdk.js?appkey={JavaScript키}&autoload=false`
+  - 발급: developers.kakao.com > 앱 > 플랫폼 키 > JavaScript 키. JavaScript SDK 도메인(예: `http://localhost:3000`, 배포 도메인)을 등록해야 한다.
+  - 지도 초기화·커스텀 오버레이 마커·경계 맞춤은 `client/src/components/Map.tsx`, `client/src/pages/Home.tsx`의 `MapPanel`.
 - 카카오 로컬 API(카테고리로 장소 검색): `https://dapi.kakao.com/v2/local/search/category.json`
   - 서버에서 `Authorization: KakaoAK {REST_API_KEY}` 헤더로 호출한다(`server/places.ts`).
   - 지도 좌표(`x`,`y`) + `radius`(1.2km) + `category_group_code`(대형마트 MT1·학교 SC4·지하철역 SW8)로 **거리순** 집계한다. `meta.total_count`가 반경 내 전체 개수.

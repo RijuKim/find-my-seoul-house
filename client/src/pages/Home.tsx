@@ -364,44 +364,44 @@ function MapPanel({
   selectedIds: string[];
   onSelect: (id: string) => void;
 }) {
-  const mapRef = useRef<naver.maps.Map | null>(null);
-  const markersRef = useRef<naver.maps.Marker[]>([]);
+  const mapRef = useRef<kakao.maps.Map | null>(null);
+  const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([]);
 
-  const drawMarkers = (map: naver.maps.Map) => {
-    if (!window.naver?.maps) return;
-    markersRef.current.forEach((marker) => marker.setMap(null));
-    markersRef.current = [];
+  const drawMarkers = (map: kakao.maps.Map) => {
+    if (!window.kakao?.maps) return;
+    overlaysRef.current.forEach((overlay) => overlay.setMap(null));
+    overlaysRef.current = [];
 
-    const bounds = new window.naver.maps.LatLngBounds();
+    const bounds = new window.kakao.maps.LatLngBounds();
     visibleListings.forEach((listing) => {
-      const position = new window.naver.maps.LatLng(listing.lat, listing.lng);
+      const position = new window.kakao.maps.LatLng(listing.lat, listing.lng);
       const markerContent = document.createElement("button");
       markerContent.className = `map-price-marker ${selectedIds.includes(listing.id) ? "is-selected" : ""}`;
       markerContent.type = "button";
       markerContent.innerHTML = `<strong>${formatPrice(listing.price)}</strong><span>${listing.name}</span>`;
       markerContent.setAttribute("aria-label", `${listing.name} ${formatPrice(listing.price)} 비교 추가`);
 
-      const marker = new window.naver.maps.Marker({
+      const overlay = new window.kakao.maps.CustomOverlay({
         map,
         position,
-        title: `${listing.name} · ${formatPrice(listing.price)}`,
-        icon: {
-          content: markerContent,
-          anchor: new window.naver.maps.Point(0, 0),
-        },
+        content: markerContent,
+        xAnchor: 0.5,
+        yAnchor: 1,
+        zIndex: selectedIds.includes(listing.id) ? 10 : 1,
+        clickable: true,
       });
-      window.naver.maps.Event.addListener(marker, "click", () => onSelect(listing.id));
-      markersRef.current.push(marker);
+      window.kakao.maps.event.addListener(overlay, "click", () => onSelect(listing.id));
+      overlaysRef.current.push(overlay);
       bounds.extend(position);
     });
 
     if (visibleListings.length > 0) {
-      map.fitBounds(bounds, 56);
+      map.setBounds(bounds, 56, 56, 56, 56);
     }
   };
 
   useEffect(() => () => {
-    markersRef.current.forEach((marker) => marker.setMap(null));
+    overlaysRef.current.forEach((overlay) => overlay.setMap(null));
   }, []);
 
   useEffect(() => {
@@ -421,7 +421,7 @@ function MapPanel({
         <MapView
           className="listing-map"
           initialCenter={{ lat: 37.552, lng: 126.99 }}
-          initialZoom={11}
+          initialLevel={8}
           onMapReady={(map) => {
             mapRef.current = map;
             drawMarkers(map);

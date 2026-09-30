@@ -42,7 +42,7 @@ pnpm run start
 | `KAPT_LIST_SERVICE_KEY`    | K-apt 단지 목록                       | 서버 |
 | `KAPT_BASIS_SERVICE_KEY`   | K-apt 기본·상세정보                   | 서버 |
 | `BUILDING_HUB_SERVICE_KEY` | 건축HUB 건축물대장                    | 서버 |
-| `VITE_NAVER_MAPS_CLIENT_ID` | 브라우저 지도 JS (NCP ncpKeyId)      | 브라우저 |
+| `VITE_KAKAO_MAPS_JS_KEY`   | 브라우저 지도 JS (Kakao JS 키)       | 브라우저 |
 | `KAKAO_REST_API_KEY`       | 카카오 로컬 API (입지 신호)          | 서버 |
 | `PORT`                     | 서버 포트 (기본 3000)                 | 서버 |
 
