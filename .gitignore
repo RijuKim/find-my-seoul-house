@@ -120,3 +120,6 @@ opencode.json
 opencode.json.bak-*
 .mcp.json
 .tenet/.state/
+
+# Vercel
+.vercel/

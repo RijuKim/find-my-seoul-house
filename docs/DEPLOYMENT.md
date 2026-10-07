@@ -58,28 +58,49 @@ KAKAO_REST_API_KEY=카카오_REST_API_키
 - 상권·학군·교통 신호(`server/places.ts`)는 서버에서 카카오 로컬 API를 `KAKAO_REST_API_KEY`로 호출합니다. 지도 좌표 기준 반경 1.2km의 대형마트·학교·지하철역을 거리순으로 집계합니다.
 - 자체 지도 SDK 경로를 쓸 경우 `VITE_KAKAO_MAPS_JS_URL`로 base URL을 바꿀 수 있습니다.
 
-## 4. 일반적인 Node 호스팅 배포
+## 4. Vercel 배포 (권장)
 
-Railway, Render, Fly.io, Northflank처럼 Node.js 장기 실행 프로세스를 지원하는 서비스에서는 다음 설정을 사용합니다.
+프론트(정적)와 tRPC API를 Vercel 하나에 배포한다. 서버는 상시 프로세스가 아니라 `api/trpc/[...trpc].ts` 서버리스 함수로 동작한다.
 
-- **Install command:** `pnpm install --frozen-lockfile` 또는 서비스가 pnpm을 지원하지 않으면 `npm install`
+구성:
+- `vercel.json`: build `vite build`, output `dist/public`, SPA fallback rewrite, API 함수 maxDuration 60s
+- `api/trpc/[...trpc].ts`: `fetchRequestHandler`로 `server/routers.ts`의 라우터를 노출
+- 함수 런타임은 Node.js (기본), 리전은 `iad1` 기본
+
+배포 방법:
+1. https://vercel.com/new 에서 `RijuKim/find-my-seoul-house` 임포트
+2. Framework Preset: **Other** (또는 Vite), 빌드 설정은 `vercel.json`이 대신 처리
+3. 환경변수 등록 (아래) → Deploy
+
+환경변수 (Vercel Project Settings > Environment Variables):
+```env
+MOLIT_SERVICE_KEY=
+KAPT_LIST_SERVICE_KEY=
+KAPT_BASIS_SERVICE_KEY=
+BUILDING_HUB_SERVICE_KEY=
+KAKAO_REST_API_KEY=
+VITE_KAKAO_MAPS_JS_KEY=
+```
+- `VITE_*` 값은 **빌드 시** 번들에 심긴다. 바꾸면 재배포해야 반영된다.
+- `KAKAO_REST_API_KEY`는 서버 함수에서만 쓰이며 클라이언트로 노출되지 않는다.
+
+배포 후 확인:
+- `https://<project>.vercel.app/` → 화면 로드
+- `https://<project>.vercel.app/api/trpc/system.health?input=%7B%22json%22%3A%7B%22timestamp%22%3A1%7D%7D` → `{"result":{"data":{"json":{"ok":true}}}}`
+- 카카오 JavaScript SDK 도메인에 배포 도메인을 등록해야 지도가 뜬다.
+
+참고: 서버리스 특성상 인메모리 캐시(`regionCache`)는 인스턴스가 재활용될 때만 유지된다. 정확성에는 영향이 없지만 콜드 요청마다 국토부 API를 다시 호출할 수 있다.
+
+## 5. Node.js 장기 실행 호스팅 (Render/Railway)
+
+Vercel 대신 상시 서버로 배포하려면 (예: Render) 다음을 사용한다. `render.yaml`이 포함되어 있다.
+
 - **Build command:** `pnpm run build`
 - **Start command:** `pnpm run start`
-- **Node version:** 20 이상 권장
-- **Port:** 서비스가 제공하는 `PORT` 환경변수를 자동 사용하며, 없으면 3000을 사용
+- **Node version:** 20 이상
+- **Port:** `PORT` 환경변수 우선, 없으면 3000
 
-현재 서버는 `PORT` 환경변수를 우선 사용하고, 값이 없으면 3000부터 사용 가능한 포트를 찾습니다.
-
-## 5. Vercel·Netlify·GitHub Pages
-
-이 서비스들은 정적 프론트 배포에는 적합하지만, 현재의 Express/tRPC 서버를 그대로 장기 실행하는 방식과는 맞지 않습니다.
-
-선택지는 두 가지입니다.
-
-1. 프론트는 Vercel/Netlify에 배포하고, `server/`는 Railway·Render 등에 별도 배포
-2. 서버를 해당 서비스의 Serverless Function 구조로 변환
-
-현재 구조를 그대로 옮기는 가장 쉬운 방법은 **프론트와 서버를 같은 Node 호스팅에 배포하는 것**입니다.
+Render 무료 플랜은 15분 유휴 후 스핀다운(이후 첫 요청 ~1분), 외부 API 호출이 많은 서비스는 정지될 수 있다. 안정 운영에는 유료 플랜을 권장한다.
 
 ## 6. 인앱토스에 배포할 때 확인할 것
 

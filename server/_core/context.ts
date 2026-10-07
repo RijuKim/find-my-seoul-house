@@ -1,15 +1,7 @@
-import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+// 프레임워크 비의존 tRPC 컨텍스트.
+// 모든 프로시저가 publicProcedure이고 ctx를 사용하지 않는다.
+export type TrpcContext = Record<string, unknown>;
 
-export type TrpcContext = {
-  req: CreateExpressContextOptions["req"];
-  res: CreateExpressContextOptions["res"];
-};
-
-export async function createContext(
-  opts: CreateExpressContextOptions,
-): Promise<TrpcContext> {
-  return {
-    req: opts.req,
-    res: opts.res,
-  };
+export async function createContext(): Promise<TrpcContext> {
+  return {};
 }
