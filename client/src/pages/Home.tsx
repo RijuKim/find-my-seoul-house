@@ -217,6 +217,7 @@ function MapPanel({
 }) {
   const mapRef = useRef<kakao.maps.Map | null>(null);
   const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([]);
+  const [mapReady, setMapReady] = useState(false);
 
   const drawMarkers = (map: kakao.maps.Map) => {
     if (!window.kakao?.maps) return;
@@ -255,9 +256,11 @@ function MapPanel({
     overlaysRef.current.forEach((overlay) => overlay.setMap(null));
   }, []);
 
+  // 지도 준비 완료 또는 표시 목록/선택 변경 시 마커를 다시 그린다.
+  // (지도 로딩과 데이터 로딩 순서가 뒤바뀌어도 마커가 누락되지 않게 한다.)
   useEffect(() => {
-    if (mapRef.current) drawMarkers(mapRef.current);
-  }, [visibleListings, selectedIds]);
+    if (mapReady && mapRef.current) drawMarkers(mapRef.current);
+  }, [mapReady, visibleListings, selectedIds]);
 
   return (
     <div className="map-panel">
@@ -275,7 +278,7 @@ function MapPanel({
           initialLevel={8}
           onMapReady={(map) => {
             mapRef.current = map;
-            drawMarkers(map);
+            setMapReady(true);
           }}
         />
         <div className="map-source-note"><CircleDollarSign size={14} /><span>매매가 {formatPrice(budgetTotal)} 이하 · 현재 필터 결과</span></div>
