@@ -217,3 +217,14 @@
 @media (min-width: 1024px) { .comparison-dialog { width: min(1240px, calc(100vw - 4rem)); } .comparison-column { min-width: 0; } }
 @media (max-width: 1023px) { .multi-select-control { border-left: 0; padding: 0 .4rem; } }
 @media (max-width: 639px) { .multi-select-control { width: 100%; } }
+
+/* 결정적 해석 레이어 */
+.interpretation { padding: .7rem .75rem; margin-bottom: .85rem; background: #f6faf3; border: 1px solid #e2ecdd; border-radius: .6rem; }
+.interpretation-headline { margin: 0; color: #2f4a3d; font-size: .74rem; font-weight: 900; line-height: 1.35; letter-spacing: -.03em; }
+.interpretation-evidence { display: flex; flex-wrap: wrap; gap: .3rem .55rem; margin-top: .5rem; }
+.interpretation-evidence span { display: inline-flex; align-items: baseline; gap: .25rem; color: #557063; font-size: .58rem; }
+.interpretation-evidence em { color: #8a998f; font-style: normal; font-weight: 700; }
+.interpretation.is-budget-gap { background: #fdf6ee; border-color: #f0e0c8; }
+.interpretation.is-budget-gap .interpretation-headline { color: #8a5a2b; }
+.interpretation.is-space-age { background: #f2f7fc; border-color: #dbe8f3; }
+.interpretation.is-space-age .interpretation-headline { color: #2f4f70; }

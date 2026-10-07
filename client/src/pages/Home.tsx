@@ -3,6 +3,13 @@ import { toast } from "sonner";
 import { MapView } from "@/components/Map";
 import { trpc } from "@/lib/trpc";
 import {
+  type BudgetInputs,
+  type Interpretation,
+  type InterpretationRecord,
+  formatWon,
+  interpret,
+} from "@/lib/interpretation";
+import {
   ArrowDownUp,
   ArrowRight,
   BadgeCheck,
@@ -132,11 +139,13 @@ function ListingVisual({ listing }: { listing: Listing }) {
 
 function ListingCard({
   listing,
+  interpretation,
   selected,
   onSelect,
   periodYears,
 }: {
   listing: Listing;
+  interpretation?: Interpretation;
   selected: boolean;
   onSelect: () => void;
   periodYears: number;
@@ -159,6 +168,16 @@ function ListingCard({
         </div>
       </div>
       <div className="listing-card-body">
+        {interpretation && (
+          <div className={`interpretation is-${interpretation.kind}`}>
+            <p className="interpretation-headline">{interpretation.headline}</p>
+            <div className="interpretation-evidence">
+              {interpretation.evidence.map((item) => (
+                <span key={item.label}><em>{item.label}</em> {item.value}</span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="listing-heading">
           <div>
             <h3>{listing.name}</h3>
@@ -382,6 +401,44 @@ export default function Home() {
 
   const districtOptions = useMemo(() => districtMetadata?.map(({ district }) => district) ?? Array.from(new Set(listings.map((listing) => listing.districtName).filter((name): name is string => Boolean(name)))).sort((a, b) => a.localeCompare(b, "ko")), [districtMetadata, listings]);
 
+  // 해석 엔진 입력. 앱의 탐색 예산(total) 조건을 그대로 재현한다.
+  // 앱은 savings + 상환가능원금(repaymentLoan) 과 LTV 상한만 쓰므로,
+  // 엔진의 별도 ceiling은 무한대로 두어 제약하지 않게 한다.
+  const budgetInputs = useMemo<BudgetInputs>(() => ({
+    cashWon: savings * 10000,
+    incomeAnnualWon: monthly * 12 * 10000,
+    debtMonthlyWon: 0,
+    reserveWon: 0,
+    feesWon: 0,
+    rateAnnual: rate / 100,
+    termMonths: years * 12,
+    allocationRatio: 1,
+    loanCeilingWon: Number.MAX_SAFE_INTEGER,
+    financedShare: ltv / 100,
+  }), [savings, monthly, rate, years, ltv]);
+
+  const interpretationRecords = useMemo<InterpretationRecord[]>(
+    () => listings.map((listing) => ({
+      id: listing.id,
+      name: listing.name,
+      housingType: listing.propertyType === "villa" ? "villa" : "apartment",
+      tradeType: "sale",
+      priceWon: listing.price * 10000,
+      areaM2: listing.area > 0 ? listing.area : null,
+      builtYear: listing.year > 0 ? listing.year : null,
+      contractDate: listing.contract.replace("계약일 ", ""),
+    })),
+    [listings],
+  );
+
+  const interpretationsById = useMemo(() => {
+    const map = new Map<string, Interpretation>();
+    for (const record of interpretationRecords) {
+      map.set(record.id, interpret(record, budgetInputs, interpretationRecords));
+    }
+    return map;
+  }, [interpretationRecords, budgetInputs]);
+
   const filteredListings = useMemo(() => {
     const next = listings.filter((listing) => {
       const fitsDistrict = districtFilter === "전체 구" || listing.districtName === districtFilter;
@@ -575,7 +632,7 @@ export default function Home() {
               <div className="empty-state loading-state"><CircleDollarSign size={24} /><h3>실거래 데이터를 불러오는 중이에요.</h3><p>{region === "seoul" ? "서울 25개 구" : "경기 시·군·구"}의 최근 신고 내역을 확인하고 있어요.</p></div>
             ) : filteredListings.length > 0 ? (
               <div className="listing-grid">
-                {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} selected={selectedIds.includes(listing.id)} periodYears={periodYears} onSelect={() => toggleCompare(listing.id)} /></div>)}
+                {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} interpretation={interpretationsById.get(listing.id)} selected={selectedIds.includes(listing.id)} periodYears={periodYears} onSelect={() => toggleCompare(listing.id)} /></div>)}
               </div>
             ) : (
               <div className="empty-state"><Search size={24} /><h3>{tradesError || tradeResponse?.sourceWarning ? "실거래 데이터를 일부 불러오지 못했어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError || tradeResponse?.sourceWarning ? (tradeResponse?.sourceWarning ?? "잠시 후 다시 시도해 주세요.") : "구·시나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { setDistrictFilter("전체 구"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>필터 초기화 <ArrowRight size={15} /></button></div>
@@ -609,6 +666,16 @@ export default function Home() {
               {selectedListings.map((listing) => <div className="comparison-column" key={listing.id}>
                 <ListingVisual listing={listing} />
                 <div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district} · {listing.propertyType === "villa" ? "빌라" : "아파트"}</p></div>
+                {interpretationsById.get(listing.id) && (
+                  <div className={`interpretation is-${interpretationsById.get(listing.id)!.kind}`}>
+                    <p className="interpretation-headline">{interpretationsById.get(listing.id)!.headline}</p>
+                    <div className="interpretation-evidence">
+                      {interpretationsById.get(listing.id)!.evidence.map((item) => (
+                        <span key={item.label}><em>{item.label}</em> {item.value}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="comparison-price"><span>최근 신고가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div>
                 <div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡ · {listing.areaBucket}</b></div><div><span>연식</span><b>{listing.year > 0 ? `${listing.builtAge}년차` : "정보 없음"}</b></div><div><span>계약일</span><b>{listing.contract.replace("계약일 ", "")}</b></div><div><span>층</span><b>{listing.floor}</b></div></div>
                 <div className="trend-report"><div className="comparison-subhead"><TrendingUp size={14} /> 기간별 상승폭 · 필터와 무관하게 전체 표시</div><div className="trend-report-grid">{([1, 3, 5, 10] as const).map((yearsAgo) => { const trend = comparisonTrendSeries?.[yearsAgo] ?? listing.trendPcts?.[yearsAgo]; return <div key={yearsAgo}><span>{yearsAgo}년</span><b className={(trend ?? 0) >= 0 ? "trend-up" : "trend-down"}>{trendsLoading && !comparisonLoadTimedOut ? "조회 중" : trend === undefined ? "데이터 없음" : `${trend >= 0 ? "+" : ""}${trend}%`}</b></div>; })}</div></div>
