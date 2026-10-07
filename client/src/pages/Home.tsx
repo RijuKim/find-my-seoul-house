@@ -11,22 +11,17 @@ import {
   Check,
   ChevronDown,
   CircleDollarSign,
-  Clock3,
-  Heart,
   Home as HomeIcon,
   LayoutGrid,
   MapPin,
   Menu,
-  Plus,
   Scale,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Star,
   TrainFront,
   TrendingUp,
-  UserRound,
   WalletCards,
   X,
   Zap,
@@ -45,12 +40,8 @@ type Listing = {
   floor: string;
   year: number;
   station: string;
-  commute: string;
-  tags: string[];
+  contract: string;
   visual: string;
-  accent: string;
-  score: number;
-  note: string;
   lawdCd?: string;
   neighborhood?: string;
   jibun?: string;
@@ -60,161 +51,6 @@ type Listing = {
   areaBucket?: string;
   builtAge?: number;
 };
-
-const sampleListings: Listing[] = [
-  {
-    id: "gwangjin",
-    name: "광장힐스테이트",
-    district: "광진구 광장동",
-    cluster: "한강권",
-    lat: 37.5479,
-    lng: 127.1037,
-    price: 79500,
-    area: 59,
-    floor: "10/18층",
-    year: 2012,
-    station: "광나루역 도보 8분",
-    commute: "강남 24분",
-    tags: ["한강생활권", "초품아"],
-    visual: "from-[#97bbc8] via-[#dfe9e4] to-[#f5d9a8]",
-    accent: "#d2f36b",
-    score: 92,
-    note: "예산 상단에 맞춘 한강권 실거주형",
-  },
-  {
-    id: "susaek",
-    name: "수색자이",
-    district: "은평구 수색동",
-    cluster: "서북권",
-    lat: 37.5814,
-    lng: 126.8958,
-    price: 74200,
-    area: 59,
-    floor: "15/22층",
-    year: 2020,
-    station: "수색역 도보 6분",
-    commute: "광화문 20분",
-    tags: ["신축급", "역세권"],
-    visual: "from-[#b2c8db] via-[#eef1e7] to-[#e2bc9d]",
-    accent: "#a5e6d1",
-    score: 89,
-    note: "신축급 컨디션과 광화문 접근성",
-  },
-  {
-    id: "gangdong",
-    name: "강동리엔파크",
-    district: "강동구 상일동",
-    cluster: "동남권",
-    lat: 37.5502,
-    lng: 127.1631,
-    price: 77800,
-    area: 59,
-    floor: "7/20층",
-    year: 2019,
-    station: "상일동역 도보 9분",
-    commute: "잠실 18분",
-    tags: ["대단지", "공원인접"],
-    visual: "from-[#b8d5cb] via-[#f4e6c5] to-[#c3a889]",
-    accent: "#f2ca78",
-    score: 87,
-    note: "잠실 생활권을 누리는 대단지",
-  },
-  {
-    id: "guro",
-    name: "구로두산위브",
-    district: "구로구 구로동",
-    cluster: "서남권",
-    lat: 37.4954,
-    lng: 126.8874,
-    price: 68800,
-    area: 59,
-    floor: "8/15층",
-    year: 2006,
-    station: "구로역 도보 10분",
-    commute: "여의도 22분",
-    tags: ["직주근접", "가격메리트"],
-    visual: "from-[#c2d8e0] via-[#f3ebd3] to-[#d5ae92]",
-    accent: "#bfdcff",
-    score: 85,
-    note: "여의도 출퇴근과 가격 균형형",
-  },
-  {
-    id: "sinnae",
-    name: "신내데시앙",
-    district: "중랑구 신내동",
-    cluster: "북부권",
-    lat: 37.6126,
-    lng: 127.1045,
-    price: 64900,
-    area: 59,
-    floor: "12/18층",
-    year: 2013,
-    station: "신내역 도보 7분",
-    commute: "종로 29분",
-    tags: ["숲세권", "맞춤예산"],
-    visual: "from-[#a4c2ae] via-[#e8edda] to-[#d0b78d]",
-    accent: "#e2ed9e",
-    score: 84,
-    note: "여유 자금까지 남기는 안정형",
-  },
-  {
-    id: "gaebong",
-    name: "개봉한진타운",
-    district: "구로구 개봉동",
-    cluster: "서남권",
-    lat: 37.4947,
-    lng: 126.8581,
-    price: 60300,
-    area: 49,
-    floor: "5/15층",
-    year: 2001,
-    station: "개봉역 도보 5분",
-    commute: "용산 17분",
-    tags: ["초역세권", "리모델링"],
-    visual: "from-[#b5d0df] via-[#f0e1d0] to-[#c89373]",
-    accent: "#ffd08c",
-    score: 82,
-    note: "용산 접근성과 낮은 진입가격",
-  },
-  {
-    id: "sanggye",
-    name: "상계주공 5단지",
-    district: "노원구 상계동",
-    cluster: "북부권",
-    lat: 37.6542,
-    lng: 127.0612,
-    price: 57800,
-    area: 49,
-    floor: "4/15층",
-    year: 1988,
-    station: "노원역 도보 8분",
-    commute: "종로 31분",
-    tags: ["대단지", "정비기대"],
-    visual: "from-[#c5d9cf] via-[#eee6cf] to-[#c9a27d]",
-    accent: "#c3f0bd",
-    score: 78,
-    note: "정비사업 기대감이 있는 진입형",
-  },
-  {
-    id: "banpo",
-    name: "반포래미안퍼스티지",
-    district: "서초구 반포동",
-    cluster: "강남권",
-    lat: 37.5048,
-    lng: 126.9945,
-    price: 198000,
-    area: 59,
-    floor: "11/28층",
-    year: 2009,
-    station: "고속터미널역 도보 5분",
-    commute: "강남 9분",
-    tags: ["상급지", "학군"],
-    visual: "from-[#b6becb] via-[#e6ddd4] to-[#c69d80]",
-    accent: "#f2b26e",
-    score: 96,
-    note: "비교 기준점으로 함께 확인해보세요",
-  },
-];
 
 const formatPrice = (value: number) => {
   if (value >= 10000) {
@@ -286,10 +122,10 @@ function ListingVisual({ listing }: { listing: Listing }) {
         ))}
       </div>
       <div className="visual-copy">
-        <span>{listing.districtName ?? "SEOUL"} / LOCATION</span>
+        <span>{listing.districtName ?? "SEOUL"} / {listing.propertyType === "villa" ? "VILLA" : "APT"}</span>
         <strong>{listing.area}㎡</strong>
       </div>
-      <div className="visual-stamp">{listing.score} MATCH</div>
+      <div className="visual-stamp">{listing.areaBucket ?? "실거래"}</div>
     </div>
   );
 }
@@ -318,7 +154,7 @@ function ListingCard({
           {selected ? <Check size={17} strokeWidth={2.7} /> : <Scale size={17} />}
         </button>
         <div className="listing-card-label">
-          <span>{listing.note}</span>
+          <span>{listing.propertyType === "villa" ? "빌라·다세대" : "아파트"} 신고 실거래</span>
           <strong>{formatPrice(listing.price)}</strong>
         </div>
       </div>
@@ -330,9 +166,6 @@ function ListingCard({
               <MapPin size={13} /> {listing.district}
             </p>
           </div>
-          <div className="listing-score">
-            <Star size={13} fill="currentColor" /> {listing.score}
-          </div>
         </div>
         <div className="listing-stats">
           <span>{listing.area}㎡ · {listing.areaBucket ?? "평형 확인"} · {listing.floor}</span>
@@ -341,12 +174,11 @@ function ListingCard({
         <div className="listing-route">
           <TrainFront size={14} />
           <span>{listing.station}</span>
-          <b>{listing.commute}</b>
+          <b>{listing.contract}</b>
         </div>
         <div className="tag-row">
           <span>{listing.propertyType === "villa" ? "빌라" : "아파트"}</span>
           {listing.trendPct !== undefined && <span className={listing.trendPct >= 0 ? "trend-up" : "trend-down"}>{periodYears}년 상승폭 {listing.trendPct >= 0 ? "+" : ""}{listing.trendPct}%</span>}
-          {listing.tags.map((tag) => <span key={tag}>{tag}</span>)}
         </div>
       </div>
     </article>
@@ -489,7 +321,7 @@ export default function Home() {
   const [ltv, setLtv] = useState(70);
   const [districtFilter, setDistrictFilter] = useState("전체 구");
   const [area, setArea] = useState("전체 평형");
-  const [sort, setSort] = useState("추천순");
+  const [sort, setSort] = useState("낮은 가격순");
   const [priceLimit, setPriceLimit] = useState(80000);
   const [onlyFit, setOnlyFit] = useState(true);
   const [propertyTypes, setPropertyTypes] = useState<Array<"apartment" | "villa">>(["apartment"]);
@@ -535,12 +367,8 @@ export default function Home() {
       floor: trade.floor ? `${trade.floor}층` : "층 정보 없음",
       year: trade.year,
       station: trade.roadName ? `${trade.roadName} 일대` : "주소 정보 확인",
-      commute: `계약일 ${trade.dealDate}`,
-      tags: ["국토부 실거래", `${trade.area}㎡`],
+      contract: `계약일 ${trade.dealDate}`,
       visual: gradients[index % gradients.length],
-      accent: "#d2f36b",
-      score: Math.max(60, Math.min(99, 92 - Math.round(Math.abs(trade.priceMan - budget.total) / Math.max(1, budget.total) * 30))),
-      note: "국토교통부 신고 실거래",
       lawdCd: trade.lawdCd,
       neighborhood: trade.neighborhood,
       jibun: trade.jibun,
@@ -564,8 +392,9 @@ export default function Home() {
     });
     return [...next].sort((a, b) => {
       if (sort === "낮은 가격순") return a.price - b.price;
-      if (sort === "넓은 평형순") return b.area - a.area || b.score - a.score;
-      return b.score - a.score;
+      if (sort === "높은 가격순") return b.price - a.price;
+      if (sort === "넓은 평형순") return b.area - a.area;
+      return b.area - a.area;
     });
   }, [area, budget.total, districtFilter, listings, onlyFit, priceLimit, sort]);
 
@@ -660,7 +489,7 @@ export default function Home() {
               <div className="map-node node-3"><i /> 강남권</div>
               <div className="map-route route-1" />
               <div className="map-route route-2" />
-              <span className="map-caption">실거주 · 출퇴근 · 가격을<br />동시에 맞추는 탐색</span>
+              <span className="map-caption">신고 실거래 기준으로<br />예산 안의 단지를 살펴보세요</span>
             </div>
             <div className="hero-aside-foot"><span><span className="live-dot" /> LIVE PLANNING</span><span>+{filteredListings.length} MATCHES FOUND</span></div>
           </div>
@@ -691,7 +520,7 @@ export default function Home() {
               <div className="assumption-note"><Zap size={14} /><span>월 상환액을 기준으로 원리금균등상환, 금리 {rate}%를 가정했어요.</span></div>
             </div>
             <div className="budget-result-panel">
-              <div className="result-topline"><span>추천 탐색 상한</span><span className="result-status"><span className="live-dot" /> CALCULATED</span></div>
+              <div className="result-topline"><span>탐색 예산 상한</span><span className="result-status"><span className="live-dot" /> CALCULATED</span></div>
               <div className="result-number">{formatPrice(budget.total)}</div>
               <p>내 자금 <strong>{formatPrice(savings)}</strong> + 예상 대출 <strong>{formatPrice(budget.loan)}</strong></p>
               <div className="result-progress"><div style={{ width: `${Math.min(100, (budget.total / Math.max(1, budget.ltvCapPrice)) * 100)}%` }} /></div>
@@ -700,10 +529,10 @@ export default function Home() {
             </div>
           </div>
           <div className="metrics-row">
-            <Metric label="내가 준비한 자금" value={formatPrice(savings)} detail="취득·이사비 별도" />
-            <Metric label="예상 대출 가능액" value={formatPrice(budget.loan)} detail={`금리 ${rate}% · ${years}년`} />
-            <Metric label="안전 여유자금" value={formatPrice(Math.max(0, savings - 5000))} detail="비상금 5,000만원 제외" />
-            <div className="metrics-callout"><TrendingUp size={18} /><span>예산을 바꾸면<br /><strong>추천 매물도 바로 바뀌어요.</strong></span></div>
+            <Metric label="내가 준비한 자금" value={formatPrice(savings)} detail="취득·이사비 미반영" />
+            <Metric label="예상 대출 가능액" value={formatPrice(budget.loan)} detail={`금리 ${rate}% · ${years}년 가정`} />
+            <Metric label="탐색 예산 상한" value={formatPrice(budget.total)} detail={`LTV ${ltv}% 가정 · 실제 심사와 다름`} />
+            <div className="metrics-callout"><TrendingUp size={18} /><span>예산을 바꾸면<br /><strong>조회 결과도 바로 바뀌어요.</strong></span></div>
           </div>
         </section>
 
@@ -714,7 +543,6 @@ export default function Home() {
               <h2>지금 예산으로 확인할 수 있는 실거래</h2>
               <p className="heading-sub"><span className="live-dot" /> {region === "seoul" ? "서울" : "경기"} 최근 실거래 기준 · 예산 {formatPrice(budget.total)} 안에서 <strong>{filteredListings.length}개 거래</strong>를 찾았어요.</p>
             </div>
-            <button className="save-search-button" onClick={() => toast("검색 조건을 저장했어요", { description: "새로운 매물이 들어오면 이 조건으로 다시 찾아볼게요." })}><Bell size={15} /> 이 조건 저장</button>
           </div>
 
           <div className="filter-toolbar">
@@ -726,7 +554,7 @@ export default function Home() {
             <label className="select-control"><span>상승폭</span><select value={periodYears} onChange={(event) => setPeriodYears(Number(event.target.value) as 1 | 3 | 5 | 10)}><option value={1}>최근 1년</option><option value={3}>최근 3년</option><option value={5}>최근 5년</option><option value={10}>최근 10년</option></select><ChevronDown size={14} /></label>
             <label className="select-control price-select"><span>최대 가격</span><select value={priceLimit} onChange={(event) => setPriceLimit(Number(event.target.value))}><option value={60000}>6억</option><option value={70000}>7억</option><option value={80000}>8억</option><option value={100000}>10억</option><option value={200000}>20억</option></select><ChevronDown size={14} /></label>
             <button className={`fit-toggle ${onlyFit ? "is-on" : ""}`} onClick={() => setOnlyFit((current) => !current)}><span className="toggle-dot" /> 예산 안에만</button>
-            <label className="sort-control"><ArrowDownUp size={15} /><select value={sort} onChange={(event) => setSort(event.target.value)}><option>추천순</option><option>낮은 가격순</option><option>넓은 평형순</option></select><ChevronDown size={14} /></label>
+            <label className="sort-control"><ArrowDownUp size={15} /><select value={sort} onChange={(event) => setSort(event.target.value)}><option>낮은 가격순</option><option>높은 가격순</option><option>넓은 평형순</option></select><ChevronDown size={14} /></label>
           </div>
 
           <div className="data-source-banner is-live">
@@ -758,8 +586,8 @@ export default function Home() {
         <section className="insight-section container" id="compare">
           <div className="insight-card">
             <div className="insight-icon"><Sparkles size={20} /></div>
-            <div><span className="section-kicker">03 / DECISION NOTE</span><h2>가격만 보지 말고,<br /><em>매일의 시간을 비교하세요.</em></h2><p>광화문·강남·여의도까지의 출퇴근 시간과 생활권을 함께 표시해 두었어요. 마음에 드는 매물을 2~3개 담으면 한 장의 비교 리포트로 정리해드려요.</p></div>
-            <div className="insight-stats"><div><strong>24분</strong><span>평균 출퇴근</span></div><div><strong>59㎡</strong><span>가장 많은 평형</span></div><div><strong>3개</strong><span>비교 가능 수</span></div></div>
+            <div><span className="section-kicker">03 / COMPARE REPORT</span><h2>가격만 보지 말고,<br /><em>기록을 나란히 놓고 보세요.</em></h2><p>마음에 드는 실거래를 2~3개 담으면 전용면적·연식·계약일과 함께, 매칭되는 단지 정보와 주변 입지 신호를 한 장으로 정리해드려요. 출퇴근 시간이나 학군 평가처럼 공공 데이터로 확인할 수 없는 항목은 표시하지 않아요.</p></div>
+            <div className="insight-stats"><div><strong>3개</strong><span>비교 가능 수</span></div><div><strong>계약일</strong><span>거래 시점 비교</span></div><div><strong>단지 정보</strong><span>K-apt 매칭 시</span></div></div>
           </div>
         </section>
       </main>
@@ -782,15 +610,14 @@ export default function Home() {
                 <ListingVisual listing={listing} />
                 <div className="comparison-title"><h3>{listing.name}</h3><p>{listing.district} · {listing.propertyType === "villa" ? "빌라" : "아파트"}</p></div>
                 <div className="comparison-price"><span>최근 신고가</span><strong>{formatPrice(listing.price)}</strong><small className={listing.price <= budget.total ? "good" : "over"}>{listing.price <= budget.total ? `예산보다 ${formatPrice(budget.total - listing.price)} 여유` : `예산보다 ${formatPrice(listing.price - budget.total)} 초과`}</small></div>
-                <div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡ · {listing.areaBucket}</b></div><div><span>연식</span><b>{listing.year > 0 ? `${listing.builtAge}년차` : "정보 없음"}</b></div><div><span>교통 기준</span><b>{listing.station.split(" 도보")[0]}</b></div><div><span>추천점수</span><b className="score-text"><Star size={12} fill="currentColor" /> {listing.score}</b></div></div>
+                <div className="comparison-facts"><div><span>전용면적</span><b>{listing.area}㎡ · {listing.areaBucket}</b></div><div><span>연식</span><b>{listing.year > 0 ? `${listing.builtAge}년차` : "정보 없음"}</b></div><div><span>계약일</span><b>{listing.contract.replace("계약일 ", "")}</b></div><div><span>층</span><b>{listing.floor}</b></div></div>
                 <div className="trend-report"><div className="comparison-subhead"><TrendingUp size={14} /> 기간별 상승폭 · 필터와 무관하게 전체 표시</div><div className="trend-report-grid">{([1, 3, 5, 10] as const).map((yearsAgo) => { const trend = comparisonTrendSeries?.[yearsAgo] ?? listing.trendPcts?.[yearsAgo]; return <div key={yearsAgo}><span>{yearsAgo}년</span><b className={(trend ?? 0) >= 0 ? "trend-up" : "trend-down"}>{trendsLoading && !comparisonLoadTimedOut ? "조회 중" : trend === undefined ? "데이터 없음" : `${trend >= 0 ? "+" : ""}${trend}%`}</b></div>; })}</div></div>
                 <div className="complex-data-panel"><div className="comparison-subhead"><Building2 size={14} /> 단지·관리 정보 <span className="kapt-source-badge">단지 정보</span></div><div className="comparison-data-grid"><div><span>세대수</span><b>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : complexInfoById.get(listing.id)?.households ? `${complexInfoById.get(listing.id)!.households!.toLocaleString()}세대` : "매칭 정보 없음"}</b></div><div><span>동수 · 사용승인</span><b>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : `${complexInfoById.get(listing.id)?.buildingCount ? `${complexInfoById.get(listing.id)!.buildingCount}개동` : "동수 없음"} · ${complexInfoById.get(listing.id)?.approvalDate ?? "날짜 없음"}`}</b></div><div><span>총 주차대수</span><b>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : complexInfoById.get(listing.id)?.parkingTotal ? `${complexInfoById.get(listing.id)!.parkingTotal!.toLocaleString()}대` : "주차 정보 없음"}</b></div><div><span>세대당 주차</span><b>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : complexInfoById.get(listing.id)?.parkingPerHousehold ? `${complexInfoById.get(listing.id)!.parkingPerHousehold}대` : "계산 불가"}</b></div><div><span>용적률</span><b className={complexInfoById.get(listing.id)?.floorAreaRatio ? "" : "data-pending"}>{complexInfoLoading && !comparisonLoadTimedOut ? "조회 중" : complexInfoById.get(listing.id)?.floorAreaRatio ? `${complexInfoById.get(listing.id)!.floorAreaRatio}%` : "건축물대장 매칭 정보 없음"}</b></div><div><span>데이터 상태</span><b>{complexInfoById.get(listing.id)?.buildingDataStatusMessage ?? complexInfoById.get(listing.id)?.statusMessage ?? (comparisonLoadTimedOut ? "조회 시간 초과" : "단지 정보 조회 대기")}</b></div></div></div>
                 <KaptSignalCards info={complexInfoById.get(listing.id)} loading={complexInfoLoading && !comparisonLoadTimedOut} />
-                <div className="comparison-tags">{listing.tags.map((tag) => <span key={tag}><Check size={12} /> {tag}</span>)}</div>
               </div>)}
             </div>
             <div className="location-report"><div><span className="section-kicker">LOCATION SIGNALS / 01</span><h3>첫 번째 선택 매물 주변 입지</h3><p>지도 좌표 기준 반경 1.2km의 카카오 장소 데이터를 거리순으로 집계합니다.</p></div><div className="location-signal-grid">{nearbyLoading && !comparisonLoadTimedOut ? <span className="location-loading">상권·학군·교통 데이터를 불러오는 중이에요.</span> : nearbySignals?.map((signal) => <div className="location-signal" key={signal.category}><span>{signal.category}</span><strong>{signal.count}곳</strong><small>{signal.topPlaces.length ? signal.topPlaces.join(" · ") : "주요 장소 없음"}</small></div>) ?? <span className="location-loading">{comparisonLoadTimedOut ? "입지 데이터 조회 시간이 초과됐어요." : "주변 장소 데이터를 표시하려면 매물을 선택하세요."}</span>}</div></div>
-            <div className="comparison-dialog-foot"><span><BadgeCheck size={16} /> 국토교통부 신고 실거래 기준 · 현재 매물 여부는 별도 확인</span><button onClick={() => { setShowComparison(false); toast("비교 결과를 저장했어요", { description: "다음에 다시 이 화면에서 이어서 볼 수 있어요." }); }}>비교 결과 저장 <ArrowRight size={15} /></button></div>
+            <div className="comparison-dialog-foot"><span><BadgeCheck size={16} /> 국토교통부 신고 실거래 기준 · 현재 매물 여부는 별도 확인</span><button onClick={() => setShowComparison(false)}>비교 닫기 <ArrowRight size={15} /></button></div>
           </div>
         </div>
       )}
