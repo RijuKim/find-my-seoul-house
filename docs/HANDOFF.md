@@ -1,6 +1,6 @@
 # 인수인계 (HANDOFF)
 
-최종 갱신: 2026-10-07
+최종 갱신: 2026-10-08
 
 부둥부둥(budungbudung) — 예산·소득으로 서울/경기 주거 선택지를 **과거 실거래 사례**로 탐색·비교하는 웹앱.
 
@@ -34,22 +34,36 @@
 - 서버는 로컬(장기 실행)과 Vercel(서버리스 함수) 양쪽 지원
 
 ```
-client/            React 화면 (Home.tsx가 메인, Map.tsx 지도, lib/interpretation.ts 해석)
+client/            React 화면 (Home.tsx가 메인, Map.tsx 지도, lib/interpretation.ts 해석, lib/housingFilters.ts 필터 순수 로직, lib/scaleLookup.ts 규모 조회 오케스트레이션)
 server/
   realEstate.ts    국토부 아파트·빌라 실거래
-  kapt.ts          K-apt 공동주택 단지정보
+  kapt.ts          K-apt 공동주택 단지정보 (비교 리포트용)
+  scale.ts         K-apt 목록+기본정보만 쓰는 규모 전용 정밀 매처 (complexScales)
   buildingHub.ts   건축HUB 건축물대장(용적률)
   places.ts        카카오 로컬 API (상권·학군·교통)
   routers.ts       tRPC 라우터
   _core/           context, trpc, env, index(로컬 Express 진입), vite(로컬 dev)
 api-src/trpc.ts    Vercel 서버리스 함수 소스 (fetchRequestHandler)
 scripts/build-api.mjs  api-src를 api/trpc/[...trpc].js로 esbuild 번들
+scripts/audit-scale-coverage.ts  읽기 전용 K-apt 정밀 매처 실측 감사
 api/               빌드 산출물 (gitignore)
 vercel.json        Vercel 설정
 render.yaml        Render 대안 설정
 docs/              DEPLOYMENT, data-sources, kapt-integration, HANDOFF
+tests/acceptance/housing-filters.cjs  Playwright MCP용 브라우저 수용 스크립트
 .tenet/            설계 문서(spec/harness/interview/visuals)
 ```
+
+---
+
+## 2.1 주택 유형·단지 규모 필터 (신규, 2026-10-08)
+
+- 주택 유형은 **전체 / 아파트 / 빌라·다세대** 칩으로 노출된다(`Home.tsx`). 빌라·다세대는 연립·다세대 실거래를 함께 조회하는 그룹이며, 법적 구분을 새로 하지 않는다.
+- 아파트 단지 규모 필터는 **조건**(100세대 미만 / 1개 동 / 둘 중 하나)과 **보기**(전체 / 조건에 맞는 단지만 / 조건에 맞는 단지 제외 / 규모 정보 없음)로 구성된다. 기본값은 전체 + 둘 중 하나이며 기본 조회에서는 규모 API를 전혀 호출하지 않는다.
+- 판정은 삼상(true/false/unknown)이다. 99세대는 조건 충족, 100세대는 미충족. 동수 1이면 세대수와 무관하게 충족. 누락·0·음수·NaN·비정수는 "정보 없음"이며 절대 "큰 단지"로 간주하지 않는다. 빌라는 규모 술어를 우회한다.
+- 규모 조회는 사용자가 only/exclude/unknown을 선택한 뒤에만, 현재 예산·지역·평형·가격 필터 결과의 고유 아파트 정체성만 대상으로 12개 이하 배치로 순차 실행된다. 진행률 `N/M`, 확인/부분/정보 없음/실패 집계, 실패 재시도, 규모 필터 초기화를 제공한다.
+- 서버 `realEstate.complexScales`는 K-apt 목록+기본정보만 사용한다. 이름 정규화 후 정확 일치 + 같은 동/지번 유일성 + 주소 지번 확인을 모두 통과할 때만 세대·동수를 공개하고, 아니면 not_found/ambiguous로 정보 없음 처리한다. 외부 동시성 3, 요청 타임아웃 5초, 배치 마감 25초.
+- 실측: `.tenet/runs/2026-10-07-housing-filters/research/strict-audit.md` (2026-10-08, 서울 240건→221 고유→12 표본, 3 matched, 8 not_found, 1 ambiguous, 실패 0). 초기 구현은 의도적으로 불완전하며 전체 소형 아파트를 식별한다고 주장하지 않는다.
 
 ---
 
@@ -62,7 +76,8 @@ cp .env.example .env          # 키 입력 (아래 4절)
 
 pnpm run dev                  # 로컬 개발 (Express + Vite HMR), 기본 3000
 npx tsc --noEmit              # 타입체크
-pnpm test                     # vitest (해석 27개 + 실거래 2개, 키 없으면 일부 skip)
+pnpm test                     # vitest (해석 27 + 필터 수용 14 + 규모 조회 27 + 실거래 2, 키 없으면 일부 skip)
+npx tsx scripts/audit-scale-coverage.ts   # 읽기 전용 K-apt 정밀 매처 실측 감사 (키 필요)
 pnpm run build                # vite build + 서버 esbuild (로컬 배포용)
 node scripts/build-api.mjs    # Vercel 함수 번들(필요 시)
 
@@ -144,7 +159,8 @@ http://localhost:3000
 - **거래 유형**: 매매만 지원. 전세 미구현 (`spec`엔 있으나 미착수).
 - **주택 유형**: 아파트 + 빌라·다세대. 단독·다가구 미구현 (`RTMSDataSvcSHTrade` 추가 필요).
 - **지역**: 서울/경기 드롭다운. 위치 권한 기반 자동 구·시 미구현.
-- **서버리스 캐시**: `server/realEstate.ts`의 인메모리 `regionCache`는 Vercel에서 인스턴스 재활용 시에만 유지. 콜드 요청마다 국토부 재호출 가능(정확성엔 영향 없음). 필요 시 Vercel KV/Redis로 이전.
+- **서버리스 캐시**: `server/realEstate.ts`의 인메모리 `regionCache`와 `server/scale.ts`의 규모 캐시는 Vercel에서 인스턴스 재활용 시에만 유지. 콜드 요청마다 국토부/K-apt 재호출 가능(정확성엔 영향 없음). 필요 시 Vercel KV/Redis로 이전.
+- **단지 규모 데이터 커버리지**: K-apt 등록 단지가 아닌 아파트·소형 건물은 `규모 정보 없음`으로 표시된다. 실측 표본에서도 상당수가 not_found였다(`research/strict-audit.md`). 확보율을 과장하지 않으며, 등록 여부 자체가 데이터 한계다.
 - **앱인토스**: **현재 입점 불가**. Toss 정책 3-9 "한시적 출시 불가 카테고리"에 **부동산(시세 조회/상권 분석 등)** 포함. 카테고리 오픈 시 재검토. 기술적으로도 Toss 미니앱 SDK(React Native/WebView)로 재작성이 필요.
 - **CI/테스트 자동화**: 없음. `pnpm test`는 수동.
 

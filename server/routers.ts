@@ -8,6 +8,16 @@ import {
 import { z } from "zod";
 import { fetchPlaceSignals } from "./places";
 import { fetchKaptComplexInfo } from "./kapt";
+import { fetchComplexScales, SCALE_MAX_CANDIDATES } from "./scale";
+
+const scaleCandidateSchema = z.object({
+  id: z.string().min(1).max(200),
+  apartmentName: z.string().min(1).max(120),
+  lawdCd: z.string().regex(/^\d{5}$/),
+  neighborhood: z.string().max(80).optional(),
+  jibun: z.string().max(40).optional(),
+  propertyType: z.enum(["apartment", "villa"]).optional(),
+});
 
 export const appRouter = router({
   system: systemRouter,
@@ -80,6 +90,13 @@ export const appRouter = router({
         }),
       )
       .query(({ input }) => fetchKaptComplexInfo(input.candidates)),
+    complexScales: publicProcedure
+      .input(
+        z.object({
+          candidates: z.array(scaleCandidateSchema).min(1).max(SCALE_MAX_CANDIDATES),
+        }),
+      )
+      .query(({ input }) => fetchComplexScales(input.candidates)),
   }),
 });
 

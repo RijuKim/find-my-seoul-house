@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MapView } from "@/components/Map";
 import { trpc } from "@/lib/trpc";
@@ -9,6 +9,24 @@ import {
   formatWon,
   interpret,
 } from "@/lib/interpretation";
+import {
+  SCALE_CRITERION_LABEL,
+  SCALE_MODE_LABEL,
+  scaleIdentity,
+  type ScaleCriterion,
+  type ScaleMode,
+} from "@/lib/housingFilters";
+import {
+  buildScaleTargets,
+  classifyListingScale,
+  fetchScaleTargets,
+  includeByScale,
+  isFailedStatus,
+  isScaleFilterActive,
+  type ScaleCandidatePayload,
+  type ScaleResult,
+  type ListingScaleState,
+} from "@/lib/scaleLookup";
 import {
   ArrowDownUp,
   ArrowRight,
@@ -143,12 +161,16 @@ function ListingCard({
   selected,
   onSelect,
   periodYears,
+  scaleState,
+  scaleResult,
 }: {
   listing: Listing;
   interpretation?: Interpretation;
   selected: boolean;
   onSelect: () => void;
   periodYears: number;
+  scaleState?: ListingScaleState | null;
+  scaleResult?: ScaleResult;
 }) {
   return (
     <article className={`listing-card ${selected ? "is-selected" : ""}`}>
@@ -197,6 +219,7 @@ function ListingCard({
         </div>
         <div className="tag-row">
           <span>{listing.propertyType === "villa" ? "빌라" : "아파트"}</span>
+          {listing.propertyType !== "villa" && <ScaleBadge state={scaleState ?? null} result={scaleResult} />}
           {listing.trendPct !== undefined && <span className={listing.trendPct >= 0 ? "trend-up" : "trend-down"}>{periodYears}년 상승폭 {listing.trendPct >= 0 ? "+" : ""}{listing.trendPct}%</span>}
         </div>
       </div>
@@ -209,11 +232,13 @@ function MapPanel({
   budgetTotal,
   selectedIds,
   onSelect,
+  scaleActive,
 }: {
   listings: Listing[];
   budgetTotal: number;
   selectedIds: string[];
   onSelect: (id: string) => void;
+  scaleActive?: boolean;
 }) {
   const mapRef = useRef<kakao.maps.Map | null>(null);
   const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([]);
@@ -281,7 +306,7 @@ function MapPanel({
             setMapReady(true);
           }}
         />
-        <div className="map-source-note"><CircleDollarSign size={14} /><span>매매가 {formatPrice(budgetTotal)} 이하 · 현재 필터 결과</span></div>
+        <div className="map-source-note"><CircleDollarSign size={14} /><span>매매가 {formatPrice(budgetTotal)} 이하 · 현재 필터 결과{scaleActive ? " (규모 필터 포함)" : ""}</span></div>
         <div className="map-legend"><span><i className="legend-dot fit" /> 예산 안</span><span><i className="legend-dot selected" /> 비교 선택</span><span><MapPin size={12} /> 마커를 눌러 비교에 추가</span></div>
       </div>
     </div>
@@ -335,6 +360,115 @@ function KaptSignalCards({ info, loading }: { info?: KaptSignalInfo; loading: bo
   );
 }
 
+const SCALE_FAILED_MESSAGE: Record<string, string> = {
+  unavailable: "조회 실패",
+  error: "조회 오류",
+  unsupported: "적용 대상 아님",
+};
+
+function ScaleBadge({ state, result }: { state: ListingScaleState | null; result?: ScaleResult }) {
+  if (state === null) return null;
+  if (state.state === "pending") return <span className="scale-badge is-pending">규모 확인 중</span>;
+  if (result?.status === "unavailable" || result?.status === "error" || result?.status === "unsupported") {
+    return <span className="scale-badge is-failed">{SCALE_FAILED_MESSAGE[result.status] ?? "조회 실패"}</span>;
+  }
+  if (result?.status === "not_found" || result?.status === "ambiguous") return <span className="scale-badge is-missing">규모 정보 없음</span>;
+  const parts: string[] = [];
+  if (typeof result?.households === "number") parts.push(`${result.households.toLocaleString()}세대`);
+  if (typeof result?.buildingCount === "number") parts.push(`${result.buildingCount}개 동`);
+  if (parts.length === 0) return <span className="scale-badge is-missing">규모 정보 없음</span>;
+  return <span className="scale-badge is-known">아파트 {parts.join(" · ")}</span>;
+}
+
+function ScaleStatusBanner({
+  progress,
+  lookup,
+  mode,
+  onRetry,
+  onReset,
+}: {
+  progress: { total: number; resolved: number; confirmedBoth: number; confirmedPartial: number; noMatch: number; failed: number };
+  lookup: "idle" | "running" | "done";
+  mode: ScaleMode;
+  onRetry: () => void;
+  onReset: () => void;
+}) {
+  const searching = progress.resolved < progress.total && lookup === "running";
+  const incomplete = progress.resolved < progress.total;
+  return (
+    <div className="scale-status" role="status" aria-live="polite">
+      <div className="scale-status-head">
+        <strong>{searching ? `단지 규모 확인 중 (${progress.resolved}/${progress.total})` : `단지 규모 확인 완료 (${progress.resolved}/${progress.total})`}</strong>
+        {progress.failed > 0 && <button className="scale-retry" onClick={onRetry}>실패 {progress.failed}건 다시 시도</button>}
+        <button className="scale-reset" onClick={onReset}>규모 필터 초기화</button>
+      </div>
+      <div className="scale-status-counts">
+        <span>세대·동수 확인 {progress.confirmedBoth}</span>
+        <span>일부만 확인 {progress.confirmedPartial}</span>
+        <span>정보 없음/불명확 {progress.noMatch}</span>
+        <span>조회 실패 {progress.failed}</span>
+      </div>
+      <div className="scale-status-note">
+        분모는 현재 예산·지역·평형·가격 필터를 통과한 결과의 고유 아파트 단지 수예요. 확인 중인 항목은 최종 "정보 없음"으로 세지 않아요.
+        {incomplete && lookup === "done" && " 일부 단지는 확인하지 못해 결과가 불완전할 수 있어요."}
+      </div>
+      <div className="scale-source-note">
+        출처: K-apt 공동주택 단지 목록·기본정보 (공공데이터포털). 등록 단지가 아닌 아파트는 "정보 없음"으로 표시되며, 전체 아파트를 포괄하지 않습니다.
+        {mode === "exclude" && " 제외 보기에는 조건에 해당하지 않는 것으로 확인된 아파트만 표시합니다."}
+      </div>
+    </div>
+  );
+}
+
+function ScaleControlPanel({
+  disabled,
+  criterion,
+  mode,
+  onCriterionChange,
+  onModeChange,
+  progress,
+  lookup,
+  onRetry,
+  onReset,
+}: {
+  disabled: boolean;
+  criterion: ScaleCriterion;
+  mode: ScaleMode;
+  onCriterionChange: (value: ScaleCriterion) => void;
+  onModeChange: (value: ScaleMode) => void;
+  progress: { total: number; resolved: number; confirmedBoth: number; confirmedPartial: number; noMatch: number; failed: number };
+  lookup: "idle" | "running" | "done";
+  onRetry: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <fieldset className={`scale-control ${disabled ? "is-disabled" : ""}`} disabled={disabled} aria-label="아파트 단지 규모 필터">
+      <legend>아파트 단지 규모 <span className="scale-control-scope">아파트에만 적용</span></legend>
+      <div className="scale-control-row">
+        <label className="scale-field">
+          <span>조건</span>
+          <select value={criterion} onChange={(event) => onCriterionChange(event.target.value as ScaleCriterion)} disabled={disabled} aria-label="단지 규모 조건">
+            {(["either", "households", "buildings"] as const).map((value) => <option key={value} value={value}>{SCALE_CRITERION_LABEL[value]}</option>)}
+          </select>
+        </label>
+        <label className="scale-field">
+          <span>보기</span>
+          <select value={mode} onChange={(event) => onModeChange(event.target.value as ScaleMode)} disabled={disabled} aria-label="단지 규모 보기 방식">
+            {(["all", "only", "exclude", "unknown"] as const).map((value) => <option key={value} value={value}>{SCALE_MODE_LABEL[value]}</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="scale-control-help">
+        규모 필터는 아파트에 적용돼요. 빌라·다세대는 규모 조건 없이 그대로 표시됩니다.
+        {disabled && " 현재 빌라·다세대만 보고 있어 규모 조건을 사용할 수 없어요."}
+      </p>
+      {!disabled && mode !== "all" && (
+        <ScaleStatusBanner progress={progress} lookup={lookup} mode={mode} onRetry={onRetry} onReset={onReset} />
+      )}
+    </fieldset>
+  );
+}
+
 export default function Home() {
   const [savings, setSavings] = useState(24000);
   const [monthly, setMonthly] = useState(380);
@@ -347,12 +481,19 @@ export default function Home() {
   const [priceLimit, setPriceLimit] = useState(80000);
   const [onlyFit, setOnlyFit] = useState(true);
   const [propertyTypes, setPropertyTypes] = useState<Array<"apartment" | "villa">>(["apartment"]);
+  const [scaleCriterion, setScaleCriterion] = useState<ScaleCriterion>("either");
+  const [scaleMode, setScaleMode] = useState<ScaleMode>("all");
+  const [scaleRetryToken, setScaleRetryToken] = useState(0);
   const [periodYears, setPeriodYears] = useState<1 | 3 | 5 | 10>(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonLoadTimedOut, setComparisonLoadTimedOut] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [region, setRegion] = useState<"seoul" | "gyeonggi">("seoul");
+  const trpcUtils = trpc.useUtils();
+  const scaleResultsRef = useRef<Map<string, ScaleResult>>(new Map());
+  const [scaleResults, setScaleResults] = useState<Map<string, ScaleResult>>(() => new Map());
+  const [scaleLookup, setScaleLookup] = useState<"idle" | "running" | "done">("idle");
   const { data: districtMetadata } = trpc.realEstate.districts.useQuery({ region }, { staleTime: 60 * 60 * 1000 });
   const requestedPropertyType = propertyTypes.length === 2 ? "all" : propertyTypes[0] ?? "apartment";
   const tradeMonths = requestedPropertyType === "apartment" ? 6 : 12;
@@ -442,7 +583,8 @@ export default function Home() {
     return map;
   }, [interpretationRecords, budgetInputs]);
 
-  const filteredListings = useMemo(() => {
+  // 예산/지역/평형/가격/정렬만 적용한 기본 결과. 규모 필터와 무관하게 항상 존재한다.
+  const baseListings = useMemo(() => {
     const next = listings.filter((listing) => {
       const fitsDistrict = districtFilter === "전체 구" || listing.districtName === districtFilter;
       const fitsArea = area === "전체 평형" || listing.areaBucket === area;
@@ -457,6 +599,93 @@ export default function Home() {
       return b.area - a.area;
     });
   }, [area, budget.total, districtFilter, listings, onlyFit, priceLimit, sort]);
+
+  const typeChoice = requestedPropertyType as "all" | "apartment" | "villa";
+  const scaleFilterActive = isScaleFilterActive(scaleMode, typeChoice);
+  const complexScalesFetch = useCallback(
+    (input: { candidates: ScaleCandidatePayload[] }) => trpcUtils.client.realEstate.complexScales.query(input) as Promise<ScaleResult[]>,
+    [trpcUtils],
+  );
+  // 규모 조회 대상: 현재 기본 결과의 고유 아파트 정체성. 빌라는 제외.
+  const scaleTargets = useMemo(() => buildScaleTargets(baseListings), [baseListings]);
+  const scaleTargetIdentities = useMemo(() => new Set(scaleTargets.map((target) => target.identity)), [scaleTargets]);
+
+  const listingIdentity = useCallback(
+    (listing: Listing) => scaleIdentity({ apartmentName: listing.name, lawdCd: listing.lawdCd, neighborhood: listing.neighborhood, jibun: listing.jibun }),
+    [],
+  );
+
+  // 규모 조회는 all 모드나 빌라 전용일 때 전혀 나가지 않는다.
+  useEffect(() => {
+    if (!scaleFilterActive || scaleTargets.length === 0) return;
+    let stale = false;
+    setScaleLookup("running");
+    fetchScaleTargets({
+      targets: scaleTargets,
+      known: scaleResultsRef.current,
+      fetchBatch: (candidates) => complexScalesFetch({ candidates }),
+      isStale: () => stale,
+      onResult: (identity, result) => {
+        const next = new Map(scaleResultsRef.current);
+        next.set(identity, result);
+        scaleResultsRef.current = next;
+        setScaleResults(next);
+      },
+    }).then(() => { if (!stale) setScaleLookup("done"); }).catch(() => { if (!stale) setScaleLookup("done"); });
+    return () => { stale = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scaleFilterActive, scaleMode, scaleRetryToken, region, requestedPropertyType, scaleTargets]);
+
+  const classificationFor = useCallback(
+    (listing: Listing): ListingScaleState | null => classifyListingScale(listing, scaleResults.get(listingIdentity(listing)), scaleCriterion),
+    [scaleCriterion, scaleResults, listingIdentity],
+  );
+
+  const filteredListings = useMemo(() => {
+    if (!scaleFilterActive) return baseListings;
+    return baseListings.filter((listing) => includeByScale(classificationFor(listing), listing.propertyType, scaleMode));
+  }, [baseListings, scaleFilterActive, scaleMode, classificationFor]);
+
+  // 진행률/상태 집계는 현재 기본 결과의 고유 아파트 정체성만 분모로 삼는다.
+  const scaleProgress = useMemo(() => {
+    let confirmedBoth = 0;
+    let confirmedPartial = 0;
+    let noMatch = 0;
+    let failed = 0;
+    let resolved = 0;
+    for (const identity of Array.from(scaleTargetIdentities)) {
+      const result = scaleResults.get(identity);
+      if (!result) continue;
+      resolved += 1;
+      if (result.status === "matched") {
+        const hasHouseholds = typeof result.households === "number";
+        const hasBuildings = typeof result.buildingCount === "number";
+        if (hasHouseholds && hasBuildings) confirmedBoth += 1;
+        else if (hasHouseholds || hasBuildings) confirmedPartial += 1;
+        else noMatch += 1;
+      } else if (result.status === "not_found" || result.status === "ambiguous") noMatch += 1;
+      else failed += 1;
+    }
+    return { total: scaleTargetIdentities.size, resolved, confirmedBoth, confirmedPartial, noMatch, failed };
+  }, [scaleTargetIdentities, scaleResults]);
+
+  const retryFailedScales = () => {
+    setScaleResults((current) => {
+      const next = new Map(current);
+      for (const identity of Array.from(scaleTargetIdentities)) {
+        const result = next.get(identity);
+        if (result && isFailedStatus(result.status)) next.delete(identity);
+      }
+      scaleResultsRef.current = next;
+      return next;
+    });
+    setScaleRetryToken((token) => token + 1);
+  };
+
+  const resetScaleFilter = () => {
+    setScaleMode("all");
+  };
+
 
   const selectedListings = useMemo(() => selectedIds
     .map((id) => listings.find((listing) => listing.id === id))
@@ -501,10 +730,12 @@ export default function Home() {
     });
   };
 
-  const togglePropertyType = (type: "apartment" | "villa") => {
-    setPropertyTypes((current) => current.length === 1 && current[0] === type
-      ? current
-      : current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
+  const setPropertyTypesFromChoice = (choice: "all" | "apartment" | "villa") => {
+    const next: Array<"apartment" | "villa"> = choice === "all" ? ["apartment", "villa"] : [choice];
+    setPropertyTypes(next);
+    // 빌라·다세대만 보면 아파트 규모 필터는 의미가 없으므로 all로 초기화한다.
+    // 다시 아파트를 켜면 규모 조건은 all(전체)에서 시작한다.
+    if (choice === "villa") setScaleMode("all");
     setSelectedIds([]);
   };
 
@@ -607,8 +838,31 @@ export default function Home() {
 
           <div className="filter-toolbar">
             <div className="filter-main"><SlidersHorizontal size={17} /><span>FILTER BY</span></div>
-            <label className="select-control"><span>지역</span><select value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setDistrictFilter("전체 구"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
-            <div className="multi-select-control"><span>주택유형</span><label><input type="checkbox" checked={propertyTypes.includes("apartment")} onChange={() => togglePropertyType("apartment")} /> 아파트</label><label><input type="checkbox" checked={propertyTypes.includes("villa")} onChange={() => togglePropertyType("villa")} /> 빌라·다세대</label></div>
+            <label className="select-control"><span>지역</span><select aria-label="지역" value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setDistrictFilter("전체 구"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
+            <div className="type-chip-group" role="group" aria-label="주택 유형">
+              <span className="type-chip-label">주택유형</span>
+              {([
+                { value: "all", label: "전체" },
+                { value: "apartment", label: "아파트" },
+                { value: "villa", label: "빌라·다세대" },
+              ] as const).map((option) => {
+                const pressed = option.value === "all"
+                  ? propertyTypes.length === 2
+                  : propertyTypes.length === 1 && propertyTypes[0] === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`type-chip ${pressed ? "is-selected" : ""}`}
+                    aria-pressed={pressed}
+                    onClick={() => setPropertyTypesFromChoice(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="type-chip-help">빌라·다세대는 연립·다세대 실거래를 함께 조회해요.</p>
             <label className="select-control"><span>구·시</span><select value={districtFilter} onChange={(event) => setDistrictFilter(event.target.value)}><option>전체 구</option>{districtOptions.map((districtName) => <option key={districtName} value={districtName}>{districtName}</option>)}</select><ChevronDown size={14} /></label>
             <label className="select-control"><span>평형</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>전체 평형</option><option value="10평대">10평대</option><option value="20평대">20평대</option><option value="30평대">30평대</option><option value="40평대">40평대</option><option value="50평대 이상">50평대 이상</option></select><ChevronDown size={14} /></label>
             <label className="select-control"><span>상승폭</span><select value={periodYears} onChange={(event) => setPeriodYears(Number(event.target.value) as 1 | 3 | 5 | 10)}><option value={1}>최근 1년</option><option value={3}>최근 3년</option><option value={5}>최근 5년</option><option value={10}>최근 10년</option></select><ChevronDown size={14} /></label>
@@ -616,6 +870,18 @@ export default function Home() {
             <button className={`fit-toggle ${onlyFit ? "is-on" : ""}`} onClick={() => setOnlyFit((current) => !current)}><span className="toggle-dot" /> 예산 안에만</button>
             <label className="sort-control"><ArrowDownUp size={15} /><select value={sort} onChange={(event) => setSort(event.target.value)}><option>낮은 가격순</option><option>높은 가격순</option><option>넓은 평형순</option></select><ChevronDown size={14} /></label>
           </div>
+
+          <ScaleControlPanel
+            disabled={typeChoice === "villa"}
+            criterion={scaleCriterion}
+            mode={typeChoice === "villa" ? "all" : scaleMode}
+            onCriterionChange={setScaleCriterion}
+            onModeChange={setScaleMode}
+            progress={scaleProgress}
+            lookup={scaleLookup}
+            onRetry={retryFailedScales}
+            onReset={resetScaleFilter}
+          />
 
           <div className="data-source-banner is-live">
             <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyTypes.length === 2 ? "아파트·빌라·다세대" : propertyTypes[0] === "villa" ? "빌라·다세대" : "아파트"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeMonths}개월 중 확인 가능한 거래 · 상승폭은 비교 리포트에서 확인할 수 있어요.`}</span></div></div>
@@ -627,6 +893,7 @@ export default function Home() {
             budgetTotal={budget.total}
             selectedIds={selectedIds}
             onSelect={toggleCompare}
+            scaleActive={scaleFilterActive}
           />
 
           <div className="listings-content">
@@ -635,10 +902,10 @@ export default function Home() {
               <div className="empty-state loading-state"><CircleDollarSign size={24} /><h3>실거래 데이터를 불러오는 중이에요.</h3><p>{region === "seoul" ? "서울 25개 구" : "경기 시·군·구"}의 최근 신고 내역을 확인하고 있어요.</p></div>
             ) : filteredListings.length > 0 ? (
               <div className="listing-grid">
-                {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} interpretation={interpretationsById.get(listing.id)} selected={selectedIds.includes(listing.id)} periodYears={periodYears} onSelect={() => toggleCompare(listing.id)} /></div>)}
+                {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} interpretation={interpretationsById.get(listing.id)} selected={selectedIds.includes(listing.id)} periodYears={periodYears} scaleState={classificationFor(listing)} scaleResult={scaleResults.get(listingIdentity(listing))} onSelect={() => toggleCompare(listing.id)} /></div>)}
               </div>
             ) : (
-              <div className="empty-state"><Search size={24} /><h3>{tradesError || tradeResponse?.sourceWarning ? "실거래 데이터를 일부 불러오지 못했어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError || tradeResponse?.sourceWarning ? (tradeResponse?.sourceWarning ?? "잠시 후 다시 시도해 주세요.") : "구·시나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { setDistrictFilter("전체 구"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>필터 초기화 <ArrowRight size={15} /></button></div>
+              <div className="empty-state"><Search size={24} /><h3>{tradesError || tradeResponse?.sourceWarning ? "실거래 데이터를 일부 불러오지 못했어요." : scaleFilterActive && scaleProgress.resolved < scaleProgress.total ? "단지 규모를 확인하는 중이에요." : scaleFilterActive ? "규모 조건에 맞는 아파트가 없어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError || tradeResponse?.sourceWarning ? (tradeResponse?.sourceWarning ?? "잠시 후 다시 시도해 주세요.") : scaleFilterActive && scaleProgress.resolved < scaleProgress.total ? `확인 중 (${scaleProgress.resolved}/${scaleProgress.total}) · 확인이 끝나면 결과가 갱신돼요.` : scaleFilterActive ? "규모 보기를 바꾸거나 필터를 초기화해 보세요. 확인되지 않은 단지는 제외하지 않아요." : "구·시나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { if (scaleFilterActive) { resetScaleFilter(); return; } setDistrictFilter("전체 구"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>{scaleFilterActive ? "규모 필터 초기화" : "필터 초기화"} <ArrowRight size={15} /></button></div>
             )}
           </div>
         </section>

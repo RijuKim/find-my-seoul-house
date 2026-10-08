@@ -1,0 +1,157 @@
+{
+  "startedAt": "2026-10-08T06:44:32.335Z",
+  "finishedAt": "2026-10-08T06:44:34.561Z",
+  "source": "K-apt AptListService4 + AptBasisInfoServiceV5 (공공데이터포털)",
+  "credentialsAvailable": true,
+  "region": "seoul",
+  "denominator": {
+    "tradeRecords": 240,
+    "uniqueApartmentIdentities": 221,
+    "sampled": 12,
+    "method": "evenly spaced indices over the unique apartment identity list"
+  },
+  "elapsedMs": 1294,
+  "counts": {
+    "total": 12,
+    "matched": 3,
+    "bothCounts": 3,
+    "oneCount": 0,
+    "notFound": 8,
+    "ambiguous": 1,
+    "unavailable": 0,
+    "error": 0
+  },
+  "limitations": [
+    "표본은 서울 아파트 최근 1개월 실거래에서 균등 간격으로 뽑은 진단용이며 모집단 확보율이 아니다.",
+    "K-apt 등록 단지가 아닌 건물은 정밀 매처에서 not_found/ambiguous로 남는다(정보 없음).",
+    "서버리스 인메모리 캐시는 인스턴스 재사용 시에만 유지되며 영속 캐시를 주장하지 않는다."
+  ],
+  "rows": [
+    {
+      "id": "11530|해담채3|구로동|104-3",
+      "apartmentName": "해담채3",
+      "lawdCd": "11530",
+      "neighborhood": "구로동",
+      "jibun": "104-3",
+      "status": "not_found",
+      "statusMessage": "실거래 단지명과 정확히 일치하는 K-apt 단지를 찾지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11620|관악산휴먼시아2단지|신림동|1735",
+      "apartmentName": "관악산휴먼시아2단지",
+      "lawdCd": "11620",
+      "neighborhood": "신림동",
+      "jibun": "1735",
+      "status": "not_found",
+      "statusMessage": "실거래 단지명과 정확히 일치하는 K-apt 단지를 찾지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11740|길동우성|길동|400",
+      "apartmentName": "길동우성",
+      "lawdCd": "11740",
+      "neighborhood": "길동",
+      "jibun": "400",
+      "status": "not_found",
+      "statusMessage": "실거래 단지명과 정확히 일치하는 K-apt 단지를 찾지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11380|구산그린빌|구산동|226",
+      "apartmentName": "구산그린빌",
+      "lawdCd": "11380",
+      "neighborhood": "구산동",
+      "jibun": "226",
+      "status": "matched",
+      "households": 203,
+      "buildingCount": 2,
+      "statusMessage": "K-apt 등록 단지의 공식 세대·동수 정보입니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11305|에스케이북한산시티|미아동|1353",
+      "apartmentName": "에스케이북한산시티",
+      "lawdCd": "11305",
+      "neighborhood": "미아동",
+      "jibun": "1353",
+      "status": "not_found",
+      "statusMessage": "실거래 단지명과 정확히 일치하는 K-apt 단지를 찾지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11110|킹스매너|내수동|110-15",
+      "apartmentName": "킹스매너",
+      "lawdCd": "11110",
+      "neighborhood": "내수동",
+      "jibun": "110-15",
+      "status": "not_found",
+      "statusMessage": "실거래 단지명과 정확히 일치하는 K-apt 단지를 찾지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11290|구현대|돈암동|624",
+      "apartmentName": "구현대",
+      "lawdCd": "11290",
+      "neighborhood": "돈암동",
+      "jibun": "624",
+      "status": "not_found",
+      "statusMessage": "실거래 단지명과 정확히 일치하는 K-apt 단지를 찾지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11740|래미안솔베뉴|명일동|359",
+      "apartmentName": "래미안솔베뉴",
+      "lawdCd": "11740",
+      "neighborhood": "명일동",
+      "jibun": "359",
+      "status": "matched",
+      "households": 1900,
+      "buildingCount": 13,
+      "statusMessage": "K-apt 등록 단지의 공식 세대·동수 정보입니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11500|더트루엘마곡HQ|공항동|1398",
+      "apartmentName": "더트루엘마곡HQ",
+      "lawdCd": "11500",
+      "neighborhood": "공항동",
+      "jibun": "1398",
+      "status": "ambiguous",
+      "statusMessage": "단지 주소가 실거래 동·지번과 일치하는지 확인하지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11200|이편한세상금호파크힐스|금호동1가|1823",
+      "apartmentName": "이편한세상금호파크힐스",
+      "lawdCd": "11200",
+      "neighborhood": "금호동1가",
+      "jibun": "1823",
+      "status": "not_found",
+      "statusMessage": "실거래 단지명과 정확히 일치하는 K-apt 단지를 찾지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11500|청성(877-0)|방화동|877",
+      "apartmentName": "청성(877-0)",
+      "lawdCd": "11500",
+      "neighborhood": "방화동",
+      "jibun": "877",
+      "status": "not_found",
+      "statusMessage": "실거래 단지명과 정확히 일치하는 K-apt 단지를 찾지 못했습니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    },
+    {
+      "id": "11740|올림픽파크포레온|둔촌동|633",
+      "apartmentName": "올림픽파크포레온",
+      "lawdCd": "11740",
+      "neighborhood": "둔촌동",
+      "jibun": "633",
+      "status": "matched",
+      "households": 12032,
+      "buildingCount": 85,
+      "statusMessage": "K-apt 등록 단지의 공식 세대·동수 정보입니다.",
+      "checkedAt": "2026-10-08T06:44:33.267Z"
+    }
+  ]
+}
