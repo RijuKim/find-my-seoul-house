@@ -87,6 +87,12 @@ const formatPrice = (value: number) => {
 
 const formatNumber = (value: number) => value.toLocaleString("ko-KR");
 
+const formatCheckedAt = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+};
+
 const getLoanByPayment = (monthly: number, years: number, annualRate: number) => {
   const months = years * 12;
   const monthlyRate = annualRate / 100 / 12;
@@ -384,17 +390,20 @@ function ScaleStatusBanner({
   progress,
   lookup,
   mode,
+  checkedAt,
   onRetry,
   onReset,
 }: {
   progress: { total: number; resolved: number; confirmedBoth: number; confirmedPartial: number; noMatch: number; failed: number };
   lookup: "idle" | "running" | "done";
   mode: ScaleMode;
+  checkedAt?: string;
   onRetry: () => void;
   onReset: () => void;
 }) {
   const searching = progress.resolved < progress.total && lookup === "running";
   const incomplete = progress.resolved < progress.total;
+  const checkedLabel = checkedAt ? formatCheckedAt(checkedAt) : "";
   return (
     <div className="scale-status" role="status" aria-live="polite">
       <div className="scale-status-head">
@@ -414,6 +423,7 @@ function ScaleStatusBanner({
       </div>
       <div className="scale-source-note">
         출처: K-apt 공동주택 단지 목록·기본정보 (공공데이터포털). 등록 단지가 아닌 아파트는 "정보 없음"으로 표시되며, 전체 아파트를 포괄하지 않습니다.
+        {checkedLabel && <span className="scale-checked-at"> 확인 시각: {checkedLabel} 기준.</span>}
         {mode === "exclude" && " 제외 보기에는 조건에 해당하지 않는 것으로 확인된 아파트만 표시합니다."}
       </div>
     </div>
@@ -428,6 +438,7 @@ function ScaleControlPanel({
   onModeChange,
   progress,
   lookup,
+  checkedAt,
   onRetry,
   onReset,
 }: {
@@ -438,6 +449,7 @@ function ScaleControlPanel({
   onModeChange: (value: ScaleMode) => void;
   progress: { total: number; resolved: number; confirmedBoth: number; confirmedPartial: number; noMatch: number; failed: number };
   lookup: "idle" | "running" | "done";
+  checkedAt?: string;
   onRetry: () => void;
   onReset: () => void;
 }) {
@@ -463,7 +475,7 @@ function ScaleControlPanel({
         {disabled && " 현재 빌라·다세대만 보고 있어 규모 조건을 사용할 수 없어요."}
       </p>
       {!disabled && mode !== "all" && (
-        <ScaleStatusBanner progress={progress} lookup={lookup} mode={mode} onRetry={onRetry} onReset={onReset} />
+        <ScaleStatusBanner progress={progress} lookup={lookup} mode={mode} checkedAt={checkedAt} onRetry={onRetry} onReset={onReset} />
       )}
     </fieldset>
   );
@@ -667,6 +679,17 @@ export default function Home() {
       else failed += 1;
     }
     return { total: scaleTargetIdentities.size, resolved, confirmedBoth, confirmedPartial, noMatch, failed };
+  }, [scaleTargetIdentities, scaleResults]);
+
+  // 화면에 보여줄 K-apt 조회 시각. 현재 분모에 포함된 결과 중 가장 최근 확인 시각을 쓴다.
+  const scaleCheckedAt = useMemo(() => {
+    let latest: string | undefined;
+    for (const identity of Array.from(scaleTargetIdentities)) {
+      const result = scaleResults.get(identity);
+      if (!result?.checkedAt) continue;
+      if (!latest || result.checkedAt > latest) latest = result.checkedAt;
+    }
+    return latest;
   }, [scaleTargetIdentities, scaleResults]);
 
   const retryFailedScales = () => {
@@ -879,6 +902,7 @@ export default function Home() {
             onModeChange={setScaleMode}
             progress={scaleProgress}
             lookup={scaleLookup}
+            checkedAt={scaleCheckedAt}
             onRetry={retryFailedScales}
             onReset={resetScaleFilter}
           />

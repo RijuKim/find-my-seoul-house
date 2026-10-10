@@ -113,6 +113,8 @@ async (page) => {
   const defaultCards = await cardCount();
   record("default apartment view renders cards without scale calls", defaultCards > 0 && scaleCalls.length === 0, `cards=${defaultCards} scaleCalls=${scaleCalls.length}`);
   record("no horizontal overflow at 1280", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "scrollWidth<=innerWidth");
+  const scaleSelectHeights = await page.$$eval(".scale-field select", (nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+  record("scale selects meet 44px touch target at 1280", scaleSelectHeights.length === 2 && scaleSelectHeights.every((height) => height >= 44), `heights=${scaleSelectHeights.join(",")}`);
 
   await page.getByRole("button", { name: "전체", exact: true }).click();
   await page.waitForTimeout(300);
@@ -174,8 +176,8 @@ async (page) => {
   await page.goto("http://localhost:3000/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".listing-card", { timeout: 15000 });
   record("no horizontal overflow at 360", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "scrollWidth<=innerWidth");
-  const chipsVisible = await page.$$eval(".type-chip", (nodes) => nodes.length === 3 && nodes.every((node) => node.getBoundingClientRect().height >= 32));
-  record("type chips visible and tappable at 360", chipsVisible, "3 chips rendered");
+  const chipsVisible = await page.$$eval(".type-chip", (nodes) => nodes.length === 3 && nodes.every((node) => node.getBoundingClientRect().height >= 44));
+  record("type chips visible, tappable, and 44px at 360", chipsVisible, "3 chips rendered at >=44px");
   await page.getByRole("button", { name: "전체", exact: true }).click();
   await page.selectOption('select[aria-label="단지 규모 보기 방식"]', "only");
   await page.waitForTimeout(1200);
@@ -183,6 +185,10 @@ async (page) => {
   record("no horizontal overflow after scale filter at 360", mobileOverflow, "post-filter scrollWidth<=innerWidth");
   const mobileCards = await cardCount();
   record("scale filtering works at 360", mobileCards > 0, `cards=${mobileCards}`);
+  const sourceNoteText = await page.$eval(".scale-source-note", (element) => element.innerText.replace(/\s+/g, " ")).catch(() => "");
+  record("scale status shows K-apt check time", /확인 시각/.test(sourceNoteText), sourceNoteText.slice(0, 140));
+  const resetHeight = await page.$eval(".scale-reset", (element) => element.getBoundingClientRect().height).catch(() => 0);
+  record("scale reset meets 44px touch target", resetHeight >= 44, `height=${resetHeight}`);
   await page.selectOption('select[aria-label="단지 규모 보기 방식"]', "all");
 
   // --- Region switch (fresh identities for gyeonggi) ---
@@ -207,6 +213,8 @@ async (page) => {
   const failureStatus = await statusText();
   const retryVisible = await page.$(".scale-retry");
   record("failed lookups offer retry and are distinguished from absent", Boolean(retryVisible) && failureStatus.includes("조회 실패"), failureStatus.slice(0, 80));
+  const retryHeight = retryVisible ? await retryVisible.evaluate((element) => element.getBoundingClientRect().height) : 0;
+  record("scale retry meets 44px touch target", retryHeight >= 44, `height=${retryHeight}`);
 
   forceScaleFailure = false;
   if (retryVisible) await retryVisible.click();
