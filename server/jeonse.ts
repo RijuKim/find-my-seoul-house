@@ -51,6 +51,19 @@ const firstDefined = (item: MolitItem, keys: readonly string[]) => {
 };
 
 /**
+ * 명시적 숫자 파싱. 누락/빈문자열/비숫자/NaN/Infinity → null.
+ * realEstate.number()는 누락값을 0으로 강제 변환하므로, 월세 미기재 레코드가
+ * 전세(월세 0)로 오인되지 않도록 여기서는 명시적 숫자만 인정한다.
+ */
+const explicitNumber = (value: string | number | undefined): number | null => {
+  if (value === undefined || value === null) return null;
+  const raw = text(value).replace(/,/g, "");
+  if (raw === "") return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+/**
  * 갱신/종전계약 신호 필드가 "설정됨"을 판정한다.
  * 국토부 전월세 응답은 미사용 시 빈 문자열 또는 "0"/"N"으로 오므로 이들을 미설정으로 본다.
  * 필드가 아예 없으면 보수적으로 미적용(false) — 갱신 제외 규칙을 임의 확대하지 않는다.
@@ -72,9 +85,10 @@ const isRenewalOrPriorContract = (item: MolitItem) => {
  * 월세>0(월세/반전세), 보증금 0/누락, 갱신은 모두 전세가 아니다. 추정/샘플 대체 없음.
  */
 export function isJeonseRow(item: Record<string, string | number | undefined>): boolean {
-  const deposit = number(firstDefined(item, DEPOSIT_KEYS));
-  const monthlyRent = number(firstDefined(item, MONTHLY_RENT_KEYS));
-  if (deposit <= 0 || monthlyRent !== 0) return false;
+  const deposit = explicitNumber(firstDefined(item, DEPOSIT_KEYS));
+  const monthlyRent = explicitNumber(firstDefined(item, MONTHLY_RENT_KEYS));
+  if (deposit === null || deposit <= 0) return false;
+  if (monthlyRent === null || monthlyRent !== 0) return false;
   return !isRenewalOrPriorContract(item);
 }
 
@@ -89,7 +103,8 @@ export function parseJeonseTrade(
   propertyType: JeonsePropertyType,
 ): MolitAptTrade | null {
   if (!isJeonseRow(item)) return null;
-  const deposit = number(firstDefined(item, DEPOSIT_KEYS));
+  const deposit = explicitNumber(firstDefined(item, DEPOSIT_KEYS));
+  if (deposit === null) return null;
   const apartmentName = text(firstDefined(item, APARTMENT_NAME_KEYS));
   const neighborhood = text(firstDefined(item, NEIGHBORHOOD_KEYS));
   const dealYear = text(item.dealYear);

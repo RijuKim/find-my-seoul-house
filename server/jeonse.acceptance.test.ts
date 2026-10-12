@@ -56,6 +56,21 @@ describe("isJeonseRow — 전세 판정 경계", () => {
   it("보증금 누락 → 전세 아님", () => {
     expect(isJeonseRow({ monthlyRent: 0 })).toBe(false);
   });
+  it("월세 필드 누락 → 전세 아님 (누락을 0으로 강제변환 금지)", () => {
+    expect(isJeonseRow({ deposit: 50000 })).toBe(false);
+  });
+  it("월세 비숫자 → 전세 아님", () => {
+    expect(isJeonseRow({ deposit: "50000", monthlyRent: "abc" })).toBe(false);
+  });
+  it("월세 빈 문자열 → 전세 아님", () => {
+    expect(isJeonseRow({ deposit: 50000, monthlyRent: "" })).toBe(false);
+  });
+  it("월세 '0'이 아닌 공백 → 전세 아님", () => {
+    expect(isJeonseRow({ deposit: 50000, monthlyRent: "   " })).toBe(false);
+  });
+  it("보증금 비숫자 → 전세 아님", () => {
+    expect(isJeonseRow({ monthlyRent: 0, deposit: "abc" })).toBe(false);
+  });
   it("갱신(useRRRight) → 전세 아님", () => {
     expect(
       isJeonseRow({ monthlyRent: 0, deposit: 50000, useRRRight: "Y" }),
@@ -113,6 +128,23 @@ describe("parseJeonseTrade — 보증금 → priceMan 매핑", () => {
     expect(
       parseJeonseTrade(
         { aptNm: "X", deposit: "0", monthlyRent: "0" },
+        ctx,
+        0,
+        "apartment",
+      ),
+    ).toBeNull();
+  });
+
+  it("월세 누락 레코드는 null (누락을 0으로 오인 금지)", () => {
+    expect(
+      parseJeonseTrade({ aptNm: "X", deposit: "50000" }, ctx, 0, "apartment"),
+    ).toBeNull();
+  });
+
+  it("월세 비숫자 레코드는 null", () => {
+    expect(
+      parseJeonseTrade(
+        { aptNm: "X", deposit: "50000", monthlyRent: "abc" },
         ctx,
         0,
         "apartment",
