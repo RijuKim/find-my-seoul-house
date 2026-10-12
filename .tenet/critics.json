@@ -12,6 +12,24 @@
       "job_type": "critic_eval",
       "prompt_file": ".tenet/critics/security.md",
       "full_context": true
+    },
+    {
+      "id": "jeonse-classification",
+      "builtin": false,
+      "enabled": true,
+      "stage": "jeonse_classification_critic",
+      "job_type": "critic_eval",
+      "prompt_file": ".tenet/runs/2026-10-12-jeonse/critics/jeonse-classification.md",
+      "full_context": true
+    },
+    {
+      "id": "jeonse-budget",
+      "builtin": false,
+      "enabled": true,
+      "stage": "jeonse_budget_critic",
+      "job_type": "critic_eval",
+      "prompt_file": ".tenet/runs/2026-10-12-jeonse/critics/jeonse-budget.md",
+      "full_context": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Job Queue
 
-Updated: 2026-10-10T08:29:21.450Z
+Updated: 2026-10-12T04:02:44.278Z
 
 - [!] Implement honest housing type and scale filters (housing-filters-implementation) — 7s !! opencode exited with code 1
 - [x] Verify housing filters across API and mobile desktop UI (housing-filters-integration) — 2m 38s
@@ -16,3 +16,6 @@ Updated: 2026-10-10T08:29:21.450Z
 - [x] code_critic for 56a4a4a2 — 1m 25s
 - [x] test_critic for 56a4a4a2 — 1m 5s
 - [x] interaction_e2e for 56a4a4a2 — 1m 46s
+- [x] eval-mv4mgoaw — 9s
+- [x] eval-mv4miecl — 8s
+- [x] eval-mv4q7c4h — 24s
