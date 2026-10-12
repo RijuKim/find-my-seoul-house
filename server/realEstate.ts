@@ -5,7 +5,7 @@ export const MOLIT_APT_TRADE_ENDPOINT =
 export const MOLIT_VILLA_TRADE_ENDPOINT =
   "https://apis.data.go.kr/1613000/RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade";
 
-type DistrictMeta = { lawdCd: string; district: string; cluster: string; lat: number; lng: number };
+export type DistrictMeta = { lawdCd: string; district: string; cluster: string; lat: number; lng: number };
 type DistrictRow = [string, string, string, number, number];
 const toDistricts = (rows: DistrictRow[]): DistrictMeta[] => rows.map(([lawdCd, district, cluster, lat, lng]) => ({ lawdCd, district, cluster, lat, lng }));
 
@@ -48,14 +48,14 @@ export type MolitAptTrade = {
   lat: number; lng: number; cluster: string; propertyType: "apartment" | "villa"; trendPct?: number; trendPcts?: Partial<Record<1 | 3 | 5 | 10, number>>;
 };
 
-type MolitItem = Record<string, string | number | undefined>;
-type MolitPayload = { response?: { header?: { resultCode?: string; resultMsg?: string }; body?: { items?: { item?: MolitItem | MolitItem[] }; totalCount?: number } } };
-const asArray = (item: MolitItem | MolitItem[] | undefined) => !item ? [] : Array.isArray(item) ? item : [item];
-const text = (value: string | number | undefined) => String(value ?? "").trim();
-const number = (value: string | number | undefined) => Number(text(value).replace(/,/g, "")) || 0;
+export type MolitItem = Record<string, string | number | undefined>;
+export type MolitPayload = { response?: { header?: { resultCode?: string; resultMsg?: string }; body?: { items?: { item?: MolitItem | MolitItem[] }; totalCount?: number } } };
+export const asArray = (item: MolitItem | MolitItem[] | undefined) => !item ? [] : Array.isArray(item) ? item : [item];
+export const text = (value: string | number | undefined) => String(value ?? "").trim();
+export const number = (value: string | number | undefined) => Number(text(value).replace(/,/g, "")) || 0;
 export const isLikelyNonApartmentName = (name: string) => /(빌라|아이빌|아스하임|큐브|오피스텔|도시형)/i.test(name);
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-async function settleInBatches<T>(tasks: Array<() => Promise<T>>, batchSize = 25) {
+export async function settleInBatches<T>(tasks: Array<() => Promise<T>>, batchSize = 25) {
   const settled: PromiseSettledResult<T>[] = [];
   for (let index = 0; index < tasks.length; index += batchSize) {
     const batch = await Promise.allSettled(tasks.slice(index, index + batchSize).map((task) => task()));
@@ -65,7 +65,7 @@ async function settleInBatches<T>(tasks: Array<() => Promise<T>>, batchSize = 25
   return settled;
 }
 
-async function fetchWithBackoff(url: URL) {
+export async function fetchWithBackoff(url: URL) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
     if (response.status !== 429 || attempt === 3) return response;
