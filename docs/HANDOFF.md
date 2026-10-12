@@ -1,6 +1,6 @@
 # 인수인계 (HANDOFF)
 
-최종 갱신: 2026-10-10
+최종 갱신: 2026-10-13
 
 부둥부둥(budungbudung) — 예산·소득으로 서울/경기 주거 선택지를 **과거 실거래 사례**로 탐색·비교하는 웹앱.
 
@@ -15,6 +15,7 @@
 - 실거래·지도·해석·비교·입지 신호 모두 실데이터로 동작 확인 완료.
 - **2026-10-10 재검증 (housing-filters 통합 검증, Tenet 최종 PASS)**: `pnpm check` clean, `pnpm test` 70 passed / 8 skipped, `pnpm build` + `build-api.mjs` pass. 브라우저 수용 스크립트(`tests/acceptance/housing-filters.cjs`) 전부 통과 at 1280·360, 콘솔 에러 0; 라이브 기본 조회 108건 + 지도 108개 마커, 규모 API 호출 0; 라이브 규모 조회 102개 고유 단지를 9회(≤12/회) 배치로 해석, K-apt 상류 429는 `unavailable`+재시도로 안전 처리.
 - **2026-10-10 터치 타깃 수정 (commit a9c9dc1)**: 통합 검증에서 발견된 44px 최소 터치 타깃 미달(칩 32→44, 규모 select 36→44, 재시도/초기화 32→44) 수정, `ScaleResult.checkedAt`을 "확인 시각: … 기준."으로 규모 출처 옆에 표시. 수용 스크립트에 44px·확인시각 단언 추가.
+- **2026-10-12 전세 거래 유형 추가 (Tenet run `2026-10-12-jeonse`)**: 상단 거래 유형 토글(매매 | 전세), 국토부 전월세 실거래(보증금) 기반 전세 탐색. 서버 `server/jeonse.ts`(순수 판정·파싱) + `recentTrades.tradeType`, 클라이언트 `Home.tsx` 토글·이자만 탐색 예산·전세 고지. 상세는 2.2절.
 
 ### 검증된 동작 (프로덕션)
 | 기능 | 상태 |
@@ -36,9 +37,10 @@
 - 서버는 로컬(장기 실행)과 Vercel(서버리스 함수) 양쪽 지원
 
 ```
-client/            React 화면 (Home.tsx가 메인, Map.tsx 지도, lib/interpretation.ts 해석, lib/housingFilters.ts 필터 순수 로직, lib/scaleLookup.ts 규모 조회 오케스트레이션)
+client/            React 화면 (Home.tsx가 메인, Map.tsx 지도, lib/interpretation.ts 해석, lib/explorationBudget.ts 탐색 예산(매매/전세), lib/housingFilters.ts 필터 순수 로직, lib/scaleLookup.ts 규모 조회 오케스트레이션)
 server/
   realEstate.ts    국토부 아파트·빌라 실거래
+  jeonse.ts        국토부 전월세 실거래(전세 판정: 월세0·보증금>0·비갱신)
   kapt.ts          K-apt 공동주택 단지정보 (비교 리포트용)
   scale.ts         K-apt 목록+기본정보만 쓰는 규모 전용 정밀 매처 (complexScales)
   buildingHub.ts   건축HUB 건축물대장(용적률)
@@ -69,6 +71,17 @@ tests/acceptance/housing-filters.cjs  Playwright MCP용 브라우저 수용 스�
 
 ---
 
+## 2.2 전세 거래 유형 (신규, 2026-10-12)
+
+- `Home.tsx` 상단에 **거래 유형 토글(매매 | 전세)** 이 있으며 주택 유형 칩과 완전히 분리돼 있다. 최소 44px 터치 타깃, `aria-pressed`, 키보드 포커스를 지원하고 기본값은 **매매**다.
+- 전세는 국토부 **전월세 실거래(`RTMSDataSvcAptRent`/`RTMSDataSvcRHRent`)** 의 **보증금**을 가격으로 쓴다(`priceMan = deposit`). 매매 기본 로드에서는 전월세 API를 **전혀 호출하지 않는다**.
+- 전세 판정은 순수·보수적이다(`server/jeonse.ts` `isJeonseRow`): **월세 0 AND 보증금 > 0 AND 갱신/종전계약 아님**일 때만 포함한다. 월세>0(월세·반전세), 보증금 0/누락, 갱신요구권 사용(`useRRRight`)/종전계약 레코드는 제외한다. 누락된 월세를 0으로 강제 변환하지 않으며, **샘플·추정으로 대체하지 않는다**.
+- 탐색 예산은 전세 모드에서 **이자만 상환** 기준이다(`client/src/lib/explorationBudget.ts`): 이자만 지불 시 월 이자 상한이 허용하는 원금을 LTV 상한과 비교해 유한화한다. 금리 0이어도 LTV 상한으로 유한하다(무한대 미노출). 매매 경로는 기존 원리금균등 계산 그대로다.
+- 해석 레이어는 기존 `evaluateFeasibility`의 `jeonse` 분기(이자만 월부담)를 그대로 쓴다. 전세 모드 결과/출처 영역에 "전세 실거래(과거 신고)", "월세는 제외" 고지를 표시한다.
+- 한계(정직): **월세·반전세 미지원**, 전세 판정은 응답 필드 편차에 방어적이나 필드가 아예 없는 레코드는 보수적으로 처리한다. 실제 전월세 API **활용신청/키 권한**이 없으면 서버가 부분 결과+실패 사유를 반환하며, 조회 결과는 지역·시점에 따라 0건일 수 있다. 이벤트/상태 캐시는 `regionCache`(10분, 인스턴스 재활용 한정)에 `tradeType` 포함 키로 저장된다.
+
+---
+
 ## 3. 실행 / 검증 명령
 
 ```bash
@@ -78,7 +91,7 @@ cp .env.example .env          # 키 입력 (아래 4절)
 
 pnpm run dev                  # 로컬 개발 (Express + Vite HMR), 기본 3000
 npx tsc --noEmit              # 타입체크
-pnpm test                     # vitest (해석 27 + 필터 수용 14 + 규모 조회 27 + 실거래 2, 키 없으면 일부 skip)
+pnpm test                     # vitest (해석·예산·필터·규모·전세·실거래 단위/수용, 키 없으면 일부 skip)
 npx tsx scripts/audit-scale-coverage.ts   # 읽기 전용 K-apt 정밀 매처 실측 감사 (키 필요)
 pnpm run build                # vite build + 서버 esbuild (로컬 배포용)
 node scripts/build-api.mjs    # Vercel 함수 번들(필요 시)
@@ -158,7 +171,7 @@ http://localhost:3000
 
 ## 7. 알려진 제약 / 미완 작업
 
-- **거래 유형**: 매매만 지원. 전세 미구현 (`spec`엔 있으나 미착수).
+- **거래 유형**: **매매 + 전세** 지원(2026-10-12). 전세는 보증금 기반이며 월세·반전세는 미지원(제외).
 - **주택 유형**: 아파트 + 빌라·다세대. 단독·다가구 미구현 (`RTMSDataSvcSHTrade` 추가 필요).
 - **지역**: 서울/경기 드롭다운. 위치 권한 기반 자동 구·시 미구현.
 - **서버리스 캐시**: `server/realEstate.ts`의 인메모리 `regionCache`와 `server/scale.ts`의 규모 캐시는 Vercel에서 인스턴스 재활용 시에만 유지. 콜드 요청마다 국토부/K-apt 재호출 가능(정확성엔 영향 없음). 필요 시 Vercel KV/Redis로 이전.
@@ -170,7 +183,7 @@ http://localhost:3000
 
 ## 8. 다음 후보 작업
 
-1. 전세 거래 유형 추가 (매매 계산과 이자만 상환 로직 분리 필요 — `interpretation.ts`에 `jeonsePaymentAffordablePrincipal` 이미 구현됨).
+1. 월세·반전세 예산 모델(보증금+월세) 추가 — 현재 전세는 보증금만.
 2. 단독·다가구 실거래 API 연동.
 3. 위치 권한 → 구·시 자동 해석(+수동 변경).
 4. 서버리스 캐시를 외부 KV로 이전.

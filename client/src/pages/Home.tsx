@@ -6,9 +6,11 @@ import {
   type BudgetInputs,
   type Interpretation,
   type InterpretationRecord,
+  type TradeType,
   formatWon,
   interpret,
 } from "@/lib/interpretation";
+import { computeExplorationBudget } from "@/lib/explorationBudget";
 import {
   SCALE_CRITERION_LABEL,
   SCALE_MODE_LABEL,
@@ -93,13 +95,6 @@ const formatCheckedAt = (iso: string) => {
   return date.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 };
 
-const getLoanByPayment = (monthly: number, years: number, annualRate: number) => {
-  const months = years * 12;
-  const monthlyRate = annualRate / 100 / 12;
-  if (monthlyRate === 0) return monthly * months;
-  return monthly * ((1 - Math.pow(1 + monthlyRate, -months)) / monthlyRate);
-};
-
 function BudgetField({
   label,
   value,
@@ -169,6 +164,7 @@ function ListingCard({
   periodYears,
   scaleState,
   scaleResult,
+  tradeType,
 }: {
   listing: Listing;
   interpretation?: Interpretation;
@@ -177,6 +173,7 @@ function ListingCard({
   periodYears: number;
   scaleState?: ListingScaleState | null;
   scaleResult?: ScaleResult;
+  tradeType: TradeType;
 }) {
   return (
     <article className={`listing-card ${selected ? "is-selected" : ""}`}>
@@ -191,7 +188,7 @@ function ListingCard({
           {selected ? <Check size={17} strokeWidth={2.7} /> : <Scale size={17} />}
         </button>
         <div className="listing-card-label">
-          <span>{listing.propertyType === "villa" ? "빌라·다세대" : "아파트"} 신고 실거래</span>
+          <span>{listing.propertyType === "villa" ? "빌라·다세대" : "아파트"} {tradeType === "jeonse" ? "전세" : ""} 신고 실거래</span>
           <strong>{formatPrice(listing.price)}</strong>
         </div>
       </div>
@@ -239,12 +236,14 @@ function MapPanel({
   selectedIds,
   onSelect,
   scaleActive,
+  tradeType,
 }: {
   listings: Listing[];
   budgetTotal: number;
   selectedIds: string[];
   onSelect: (id: string) => void;
   scaleActive?: boolean;
+  tradeType: TradeType;
 }) {
   const mapRef = useRef<kakao.maps.Map | null>(null);
   const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([]);
@@ -312,7 +311,7 @@ function MapPanel({
             setMapReady(true);
           }}
         />
-        <div className="map-source-note"><CircleDollarSign size={14} /><span>매매가 {formatPrice(budgetTotal)} 이하 · 현재 필터 결과{scaleActive ? " (규모 필터 포함)" : ""}</span></div>
+        <div className="map-source-note"><CircleDollarSign size={14} /><span>{tradeType === "jeonse" ? "전세 보증금" : "매매가"} {formatPrice(budgetTotal)} 이하 · 현재 필터 결과{scaleActive ? " (규모 필터 포함)" : ""}</span></div>
         <div className="map-legend"><span><i className="legend-dot fit" /> 예산 안</span><span><i className="legend-dot selected" /> 비교 선택</span><span><MapPin size={12} /> 마커를 눌러 비교에 추가</span></div>
       </div>
     </div>
@@ -502,6 +501,7 @@ export default function Home() {
   const [comparisonLoadTimedOut, setComparisonLoadTimedOut] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [region, setRegion] = useState<"seoul" | "gyeonggi">("seoul");
+  const [tradeType, setTradeType] = useState<TradeType>("sale");
   const trpcUtils = trpc.useUtils();
   const scaleResultsRef = useRef<Map<string, ScaleResult>>(new Map());
   const [scaleResults, setScaleResults] = useState<Map<string, ScaleResult>>(() => new Map());
@@ -510,21 +510,14 @@ export default function Home() {
   const requestedPropertyType = propertyTypes.length === 2 ? "all" : propertyTypes[0] ?? "apartment";
   const tradeMonths = requestedPropertyType === "apartment" ? 6 : 12;
   const { data: tradeResponse, isLoading: tradesLoading, isError: tradesError } = trpc.realEstate.recentTrades.useQuery(
-    { region, months: tradeMonths, propertyType: requestedPropertyType, periodYears },
+    { region, months: tradeMonths, propertyType: requestedPropertyType, periodYears, tradeType },
     { staleTime: 10 * 60 * 1000, retry: 1 },
   );
 
-  const budget = useMemo(() => {
-    const repaymentLoan = getLoanByPayment(monthly, years, rate);
-    const ltvCapPrice = savings / Math.max(0.01, 1 - ltv / 100);
-    const total = Math.max(0, Math.floor(Math.min(savings + repaymentLoan, ltvCapPrice) / 500) * 500);
-    return {
-      total,
-      loan: Math.max(0, total - savings),
-      repaymentLoan,
-      ltvCapPrice,
-    };
-  }, [savings, monthly, years, rate, ltv]);
+  const budget = useMemo(
+    () => computeExplorationBudget({ tradeType, savingsMan: savings, monthlyMan: monthly, years, ratePct: rate, ltvPct: ltv }),
+    [savings, monthly, years, rate, ltv, tradeType],
+  );
 
   const listings = useMemo<Listing[]>(() => {
     if (!tradeResponse?.data?.length) return [];
@@ -578,13 +571,13 @@ export default function Home() {
       id: listing.id,
       name: listing.name,
       housingType: listing.propertyType === "villa" ? "villa" : "apartment",
-      tradeType: "sale",
+      tradeType,
       priceWon: listing.price * 10000,
       areaM2: listing.area > 0 ? listing.area : null,
       builtYear: listing.year > 0 ? listing.year : null,
       contractDate: listing.contract.replace("계약일 ", ""),
     })),
-    [listings],
+    [listings, tradeType],
   );
 
   const interpretationsById = useMemo(() => {
@@ -762,6 +755,16 @@ export default function Home() {
     setSelectedIds([]);
   };
 
+  // 거래 유형 전환 시 이전 유형의 비교 선택이 남지 않도록 초기화한다.
+  // 주택 유형 칩·규모 필터 상태는 거래 유형과 독립이므로 건드리지 않는다.
+  const setTradeTypeChoice = (next: TradeType) => {
+    if (next === tradeType) return;
+    setTradeType(next);
+    setSelectedIds([]);
+  };
+
+  const tradeTypeLabel = tradeType === "jeonse" ? "전세" : "매매";
+
   return (
     <div className="app-shell noise">
       <header className="site-header">
@@ -859,6 +862,34 @@ export default function Home() {
             </div>
           </div>
 
+          <div className="trade-type-bar">
+            <div className="trade-type-group" role="group" aria-label="거래 유형">
+              <span className="trade-type-label">거래유형</span>
+              {([
+                { value: "sale", label: "매매" },
+                { value: "jeonse", label: "전세" },
+              ] as const).map((option) => {
+                const pressed = tradeType === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`trade-type-button ${pressed ? "is-selected" : ""}`}
+                    aria-pressed={pressed}
+                    onClick={() => setTradeTypeChoice(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="trade-type-help">
+              {tradeType === "jeonse"
+                ? "전세 실거래(과거 신고)를 보증금 기준으로 보여드려요. 월세는 제외해요."
+                : "매매 실거래(과거 신고)를 거래가 기준으로 보여드려요."}
+            </p>
+          </div>
+
           <div className="filter-toolbar">
             <div className="filter-main"><SlidersHorizontal size={17} /><span>FILTER BY</span></div>
             <label className="select-control"><span>지역</span><select aria-label="지역" value={region} onChange={(event) => { setRegion(event.target.value as "seoul" | "gyeonggi"); setDistrictFilter("전체 구"); setSelectedIds([]); }}><option value="seoul">서울</option><option value="gyeonggi">경기</option></select><ChevronDown size={14} /></label>
@@ -908,9 +939,16 @@ export default function Home() {
           />
 
           <div className="data-source-banner is-live">
-            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyTypes.length === 2 ? "아파트·빌라·다세대" : propertyTypes[0] === "villa" ? "빌라·다세대" : "아파트"} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeMonths}개월 중 확인 가능한 거래 · 상승폭은 비교 리포트에서 확인할 수 있어요.`}</span></div></div>
+            <div className="data-source-copy"><CircleDollarSign size={17} /><div><strong>{tradesLoading ? "국토교통부 실거래를 불러오는 중이에요." : `${region === "seoul" ? "서울" : "경기"} ${propertyTypes.length === 2 ? "아파트·빌라·다세대" : propertyTypes[0] === "villa" ? "빌라·다세대" : "아파트"} ${tradeTypeLabel} 신고 거래 데이터`}</strong><span>{tradesError ? "데이터를 잠시 불러오지 못했어요. 잠시 후 다시 시도해 주세요." : tradeResponse?.sourceWarning ?? `최근 ${tradeMonths}개월 중 확인 가능한 거래 · 상승폭은 비교 리포트에서 확인할 수 있어요.`}</span></div></div>
             <span className="api-ready-pill"><BadgeCheck size={14} /> {tradesLoading ? "LOADING" : "LIVE DATA"}</span>
           </div>
+
+          {tradeType === "jeonse" && (
+            <div className="jeonse-notice" role="note">
+              <ShieldCheck size={15} />
+              <span>전세 실거래(과거 신고) · 보증금 기준 · <strong>월세는 제외</strong>해요. 전세가 아닌 월세·반전세 거래는 표시하지 않아요.</span>
+            </div>
+          )}
 
           <MapPanel
             listings={filteredListings}
@@ -918,15 +956,16 @@ export default function Home() {
             selectedIds={selectedIds}
             onSelect={toggleCompare}
             scaleActive={scaleFilterActive}
+            tradeType={tradeType}
           />
 
           <div className="listings-content">
-            <div className="listings-summary"><span><strong>{filteredListings.length}</strong> RESULTS</span><span className="summary-line" /><span>국토부 신고 매매 / {region === "seoul" ? "서울" : "경기"} / {formatPrice(Math.min(priceLimit, budget.total))} 이하</span></div>
+            <div className="listings-summary"><span><strong>{filteredListings.length}</strong> RESULTS</span><span className="summary-line" /><span>국토부 신고 {tradeTypeLabel} / {region === "seoul" ? "서울" : "경기"} / {formatPrice(Math.min(priceLimit, budget.total))} 이하</span></div>
             {tradesLoading ? (
               <div className="empty-state loading-state"><CircleDollarSign size={24} /><h3>실거래 데이터를 불러오는 중이에요.</h3><p>{region === "seoul" ? "서울 25개 구" : "경기 시·군·구"}의 최근 신고 내역을 확인하고 있어요.</p></div>
             ) : filteredListings.length > 0 ? (
               <div className="listing-grid">
-                {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} interpretation={interpretationsById.get(listing.id)} selected={selectedIds.includes(listing.id)} periodYears={periodYears} scaleState={classificationFor(listing)} scaleResult={scaleResults.get(listingIdentity(listing))} onSelect={() => toggleCompare(listing.id)} /></div>)}
+                {filteredListings.map((listing, index) => <div className={`animate-rise delay-${Math.min(index + 1, 4)}`} key={listing.id}><ListingCard listing={listing} interpretation={interpretationsById.get(listing.id)} selected={selectedIds.includes(listing.id)} periodYears={periodYears} scaleState={classificationFor(listing)} scaleResult={scaleResults.get(listingIdentity(listing))} tradeType={tradeType} onSelect={() => toggleCompare(listing.id)} /></div>)}
               </div>
             ) : (
               <div className="empty-state"><Search size={24} /><h3>{tradesError || tradeResponse?.sourceWarning ? "실거래 데이터를 일부 불러오지 못했어요." : scaleFilterActive && scaleProgress.resolved < scaleProgress.total ? "단지 규모를 확인하는 중이에요." : scaleFilterActive ? "규모 조건에 맞는 아파트가 없어요." : "조건에 맞는 실거래가 없어요."}</h3><p>{tradesError || tradeResponse?.sourceWarning ? (tradeResponse?.sourceWarning ?? "잠시 후 다시 시도해 주세요.") : scaleFilterActive && scaleProgress.resolved < scaleProgress.total ? `확인 중 (${scaleProgress.resolved}/${scaleProgress.total}) · 확인이 끝나면 결과가 갱신돼요.` : scaleFilterActive ? "규모 보기를 바꾸거나 필터를 초기화해 보세요. 확인되지 않은 단지는 제외하지 않아요." : "구·시나 최대 가격 필터를 조금 넓혀보세요."}</p><button onClick={() => { if (scaleFilterActive) { resetScaleFilter(); return; } setDistrictFilter("전체 구"); setArea("전체 평형"); setOnlyFit(false); setPriceLimit(200000); }}>{scaleFilterActive ? "규모 필터 초기화" : "필터 초기화"} <ArrowRight size={15} /></button></div>
