@@ -50,6 +50,7 @@ export const appRouter = router({
                 z.literal(10),
               ])
               .default(1),
+            tradeType: z.enum(["sale", "jeonse"]).default("sale"),
           })
           .optional(),
       )
@@ -59,6 +60,7 @@ export const appRouter = router({
           months: input?.months ?? 1,
           propertyType: input?.propertyType ?? "all",
           periodYears: input?.periodYears ?? 1,
+          tradeType: input?.tradeType ?? "sale",
         }),
       ),
     nearbySignals: publicProcedure

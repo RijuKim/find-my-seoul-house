@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchMolitAptTrades,
+  fetchRecentAptTrades,
   GYEONGGI_DISTRICTS,
   isLikelyNonApartmentName,
+  MOLIT_APT_TRADE_ENDPOINT,
   MOLIT_VILLA_TRADE_ENDPOINT,
 } from "./realEstate";
 import { ENV } from "./_core/env";
@@ -125,5 +127,98 @@ describe("MOLIT apartment rent API (jeonse fetch)", () => {
       "MOLIT_SERVICE_KEY is not configured",
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+const salePayload = (item: Array<Record<string, string | number>>) => ({
+  response: { header: { resultCode: "00" }, body: { items: { item } } },
+});
+
+describe("fetchRecentAptTrades tradeType wiring", () => {
+  let originalKey: string;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    originalKey = ENV.molitServiceKey;
+    ENV.molitServiceKey = "test-key";
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    ENV.molitServiceKey = originalKey;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("sale(기본)은 매매 엔드포인트만 호출하고 전월세 API를 호출하지 않는다 (회귀 없음)", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        salePayload([
+          { aptNm: "매매아파트", umdNm: "삼성동", jibun: "1", dealYear: "2026", dealMonth: "9", dealDay: "30", excluUseAr: "84.9", dealAmount: "150,000" },
+        ]),
+      ),
+    );
+
+    const result = await fetchRecentAptTrades({
+      region: "seoul",
+      months: 1,
+      propertyType: "apartment",
+      perDistrict: 3,
+      limit: 3,
+    });
+
+    expect(result.tradeType).toBe("sale");
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((url) => url.includes("getRTMSDataSvcAptTrade"))).toBe(true);
+    expect(urls.some((url) => /Rent/i.test(url))).toBe(false);
+    expect(MOLIT_APT_TRADE_ENDPOINT).toContain("getRTMSDataSvcAptTrade");
+    expect(result.data[0]).toMatchObject({ apartmentName: "매매아파트", priceMan: 150000, area: 84.9, lawdCd: "11110" });
+  });
+
+  it("jeonse는 전월세 엔드포인트만 호출하고 보증금을 priceMan으로 반환한다", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        rentPayload([
+          { aptNm: "전세아파트", umdNm: "삼성동", jibun: "5", dealYear: "2026", dealMonth: "9", dealDay: "15", excluUseAr: "59.9", deposit: "42,000", monthlyRent: "0" },
+          { aptNm: "월세아파트", umdNm: "삼성동", jibun: "6", dealYear: "2026", dealMonth: "9", dealDay: "16", excluUseAr: "59.9", deposit: "1,000", monthlyRent: "60" },
+        ]),
+      ),
+    );
+
+    const result = await fetchRecentAptTrades({
+      region: "seoul",
+      months: 1,
+      propertyType: "apartment",
+      perDistrict: 3,
+      limit: 3,
+      tradeType: "jeonse",
+    });
+
+    expect(result.tradeType).toBe("jeonse");
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((url) => url.includes(MOLIT_APT_RENT_ENDPOINT))).toBe(true);
+    expect(urls.some((url) => url.includes("getRTMSDataSvcAptTrade"))).toBe(false);
+    expect(result.data.length).toBeGreaterThan(0);
+    expect(result.data.every((trade) => trade.apartmentName === "전세아파트" && trade.priceMan === 42000)).toBe(true);
+    expect(result.data.some((trade) => trade.apartmentName === "월세아파트")).toBe(false);
+    expect(result.data[0]).toMatchObject({ apartmentName: "전세아파트", priceMan: 42000, area: 59.9, lawdCd: "11110" });
+  });
+
+  it("캐시 키에 tradeType이 포함되어 sale/jeonse가 서로의 캐시를 재사용하지 않는다", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(salePayload([{ aptNm: "매매아파트", dealYear: "2026", dealMonth: "9", dealDay: "1", excluUseAr: "60", dealAmount: "100000" }])));
+    const sale = await fetchRecentAptTrades({ region: "gyeonggi", months: 1, propertyType: "apartment", perDistrict: 3, limit: 3, tradeType: "sale" });
+    const callsAfterSale = fetchMock.mock.calls.length;
+    expect(sale.tradeType).toBe("sale");
+
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValue(jsonResponse(rentPayload([{ aptNm: "전세아파트", dealYear: "2026", dealMonth: "9", dealDay: "1", excluUseAr: "60", deposit: "30000", monthlyRent: "0" }])));
+    const jeonse = await fetchRecentAptTrades({ region: "gyeonggi", months: 1, propertyType: "apartment", perDistrict: 3, limit: 3, tradeType: "jeonse" });
+    expect(jeonse.tradeType).toBe("jeonse");
+    expect(jeonse.data[0]?.priceMan).toBe(30000);
+    expect(callsAfterSale).toBeGreaterThan(0);
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(0);
   });
 });

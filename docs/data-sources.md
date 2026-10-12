@@ -6,6 +6,15 @@
 - MOLIT multi-family / villa sales API: https://www.data.go.kr/data/15126467/openapi.do
   - Official search result documents GET `getRTMSDataSvcRHTrade`.
   - API path used by the app: `https://apis.data.go.kr/1613000/RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade`
+- MOLIT apartment rent (전월세) API — 전세 탐색 소스:
+  - API path used by the app: `https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent`
+  - 매매 API와 동일한 요청 규약(`serviceKey`, `LAWD_CD`, `DEAL_YMD`, `pageNo`, `numOfRows`, `_type=json`).
+  - 앱은 **전세만** 채택한다: `monthlyRent == 0 && deposit > 0` 이고 갱신요구권/종전계약이 아닌 행만 포함. 월세>0(월세·반전세), 보증금 0/누락, 갱신은 제외한다. `priceMan = deposit`(만원), 해석 입력 `priceWon = deposit * 10000`. 추정/샘플 대체 없음.
+- MOLIT multi-family / villa rent (전월세) API:
+  - API path used by the app: `https://apis.data.go.kr/1613000/RTMSDataSvcRHRent/getRTMSDataSvcRHRent`
+  - 연립·다세대 전월세. 동일 요청 규약·동일 전세 판정.
+- 전세 조회 제약(매매와 동일): 요청당 `numOfRows`(기본 20), 배치 25건·배치간 150ms, 요청 타임아웃 8s, 429 백오프 최대 4회, 결과 limit 240, 인메모리 캐시 10분 TTL. 캐시 키에 `tradeType`(`sale`|`jeonse`)을 포함한다.
+- 매매(기본 `tradeType="sale"`) 조회는 전월세 API를 전혀 호출하지 않는다.
 - Official transaction system categories include apartment, multi-family/villa, detached/multi-household, officetel, etc.: https://rt.molit.go.kr/
 
 ## 지도·입지
