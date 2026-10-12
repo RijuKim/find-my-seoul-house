@@ -1,6 +1,6 @@
 # 인수인계 (HANDOFF)
 
-최종 갱신: 2026-10-08
+최종 갱신: 2026-10-10
 
 부둥부둥(budungbudung) — 예산·소득으로 서울/경기 주거 선택지를 **과거 실거래 사례**로 탐색·비교하는 웹앱.
 
@@ -13,6 +13,8 @@
 - **로컬 경로**: `~/projects/budungbudung`
 - **Vercel 프로젝트**: `rijukims-projects/budungbudung` (Hobby/무료, GitHub 자동 배포 연결)
 - 실거래·지도·해석·비교·입지 신호 모두 실데이터로 동작 확인 완료.
+- **2026-10-10 재검증 (housing-filters 통합 검증, Tenet 최종 PASS)**: `pnpm check` clean, `pnpm test` 70 passed / 8 skipped, `pnpm build` + `build-api.mjs` pass. 브라우저 수용 스크립트(`tests/acceptance/housing-filters.cjs`) 전부 통과 at 1280·360, 콘솔 에러 0; 라이브 기본 조회 108건 + 지도 108개 마커, 규모 API 호출 0; 라이브 규모 조회 102개 고유 단지를 9회(≤12/회) 배치로 해석, K-apt 상류 429는 `unavailable`+재시도로 안전 처리.
+- **2026-10-10 터치 타깃 수정 (commit a9c9dc1)**: 통합 검증에서 발견된 44px 최소 터치 타깃 미달(칩 32→44, 규모 select 36→44, 재시도/초기화 32→44) 수정, `ScaleResult.checkedAt`을 "확인 시각: … 기준."으로 규모 출처 옆에 표시. 수용 스크립트에 44px·확인시각 단언 추가.
 
 ### 검증된 동작 (프로덕션)
 | 기능 | 상태 |
