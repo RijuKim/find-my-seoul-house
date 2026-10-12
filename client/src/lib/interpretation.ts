@@ -182,15 +182,20 @@ export function evaluateFeasibility(
   }
 
   // jeonse: 이자만 지불
-  const paymentAffordable = jeonsePaymentAffordablePrincipal(
+  const interestOnlyPrincipal = jeonsePaymentAffordablePrincipal(
     monthlyBudget,
     inputs.rateAnnual,
   );
   const loanCap = Math.min(
-    paymentAffordable,
+    interestOnlyPrincipal,
     inputs.loanCeilingWon,
     record.priceWon * inputs.financedShare,
   );
+  // 금리 0이면 이자 부담이 없어 상환액 기준 원금은 무한대가 된다.
+  // 판정값은 실제 조달 상한(LTV/대출 한도)으로 유한화한다 (Infinity 노출 금지).
+  const paymentAffordable = Number.isFinite(interestOnlyPrincipal)
+    ? interestOnlyPrincipal
+    : loanCap;
   const neededLoan = Math.max(record.priceWon - usableCash, 0);
   const feasible = neededLoan <= loanCap;
   const borrowedLoan = feasible ? neededLoan : 0;

@@ -181,7 +181,132 @@ describe("evaluateFeasibility", () => {
   });
 });
 
+describe("evaluateFeasibility jeonse", () => {
+  const jeonseRecord = (
+    overrides: Partial<InterpretationRecord> = {},
+  ): InterpretationRecord =>
+    saleRecord({ tradeType: "jeonse", ...overrides });
+
+  it("uses an interest-only monthly burden (not an annuity)", () => {
+    const result = evaluateFeasibility(
+      jeonseRecord({ priceWon: 250_000_000 }),
+      baseInputs,
+    );
+    // monthlyBudget = (60M/12)*0.25 = 1.25M; interest-only cap = 1.25M/0.004 = 312.5M
+    // loanCap = min(312.5M, 200M ceiling, 250M*0.7=175M) = 175M
+    expect(result.feasible).toBe(true);
+    expect(result.neededLoanWon).toBe(50_000_000);
+    expect(result.loanCapWon).toBe(175_000_000);
+    expect(result.paymentAffordablePrincipalWon).toBeCloseTo(312_500_000, 0);
+    // interest-only: 50M * 4.8% / 12 = 200,000 (independent of term)
+    expect(result.monthlyPaymentWon).toBeCloseTo(200_000, 0);
+    expect(result.cashRemainingWon).toBe(0);
+  });
+
+  it("keeps every verdict field finite when the rate is zero", () => {
+    const result = evaluateFeasibility(
+      jeonseRecord({ priceWon: 300_000_000 }),
+      {
+        ...baseInputs,
+        rateAnnual: 0,
+        loanCeilingWon: 200_000_000,
+        financedShare: 0.7,
+      },
+    );
+    // payment affordability is unbounded at 0% but the LTV/ceiling caps are finite.
+    expect(result.feasible).toBe(true);
+    expect(result.loanCapWon).toBe(200_000_000);
+    expect(result.paymentAffordablePrincipalWon).toBe(200_000_000);
+    expect(result.monthlyPaymentWon).toBe(0);
+    expect(result.neededLoanWon).toBe(100_000_000);
+    for (const value of [
+      result.neededLoanWon,
+      result.loanCapWon,
+      result.paymentAffordablePrincipalWon,
+      result.monthlyPaymentWon,
+      result.cashRemainingWon,
+    ]) {
+      expect(Number.isFinite(value)).toBe(true);
+    }
+  });
+
+  it("treats zero-rate jeonse as infeasible when the LTV cap binds", () => {
+    const result = evaluateFeasibility(
+      jeonseRecord({ priceWon: 100_000_000 }),
+      {
+        ...baseInputs,
+        cashWon: 0,
+        rateAnnual: 0,
+        loanCeilingWon: Number.MAX_SAFE_INTEGER,
+        financedShare: 0.3,
+      },
+    );
+    // 100M * 0.3 = 30M cap vs 100M needed -> not feasible, and finite not Infinity
+    expect(result.feasible).toBe(false);
+    expect(result.loanCapWon).toBe(30_000_000);
+    expect(result.monthlyPaymentWon).toBe(0);
+    expect(Number.isFinite(result.paymentAffordablePrincipalWon)).toBe(true);
+  });
+
+  it("maps the deposit (priceWon) into the LTV cap, not the monthly rent", () => {
+    // deposit 30,000만 -> priceWon 300,000,000; LTV 0.7 -> 210,000,000
+    const result = evaluateFeasibility(
+      jeonseRecord({ priceWon: 30_000_000 * 10 }),
+      { ...baseInputs, loanCeilingWon: Number.MAX_SAFE_INTEGER },
+    );
+    expect(result.loanCapWon).toBe(210_000_000);
+  });
+
+  it("charges less monthly than an annuity on the same principal", () => {
+    const jeonse = evaluateFeasibility(
+      jeonseRecord({ priceWon: 300_000_000 }),
+      { ...baseInputs, cashWon: 100_000_000 },
+    );
+    const sale = evaluateFeasibility(
+      saleRecord({ priceWon: 300_000_000 }),
+      { ...baseInputs, cashWon: 100_000_000 },
+    );
+    // jeonse pays interest only: 200M * 4.8% / 12 = 800,000
+    expect(jeonse.monthlyPaymentWon).toBeCloseTo(800_000, 0);
+    expect(sale.monthlyPaymentWon).toBeGreaterThan(jeonse.monthlyPaymentWon);
+  });
+
+  it("leaves the sale path unchanged (regression)", () => {
+    const result = evaluateFeasibility(saleRecord(), baseInputs);
+    // sale affordability is the annuity principal, still finite and capped by ceiling
+    expect(result.feasible).toBe(true);
+    expect(result.neededLoanWon).toBe(150_000_000);
+    expect(result.loanCapWon).toBe(200_000_000);
+    expect(result.paymentAffordablePrincipalWon).toBeCloseTo(
+      salePaymentAffordablePrincipal(1_250_000, 0.048, 360),
+      0,
+    );
+    expect(result.monthlyPaymentWon).toBeCloseTo(
+      saleMonthlyPayment(150_000_000, 0.048, 360),
+      0,
+    );
+    expect(Number.isFinite(result.paymentAffordablePrincipalWon)).toBe(true);
+  });
+});
+
 describe("interpret", () => {
+  it("labels jeonse burden as interest-only and never prints Infinity", () => {
+    const record = saleRecord({
+      id: "jeonse-a",
+      tradeType: "jeonse",
+      priceWon: 250_000_000,
+    });
+    const result = interpret(record, baseInputs, [record]);
+    const burden = result.evidence.find((item) => item.label === "예상 월 부담");
+    expect(burden?.value).toContain("이자만 가정");
+    expect(result.headline).toContain("이자");
+    expect(result.headline).not.toContain("Infinity");
+    for (const item of result.evidence) {
+      expect(item.value).not.toContain("Infinity");
+      expect(item.value).not.toContain("NaN");
+    }
+  });
+
   it("returns a budget-gap headline with evidence when infeasible", () => {
     const result = interpret(
       saleRecord({ priceWon: 500_000_000 }),
