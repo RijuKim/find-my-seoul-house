@@ -9,6 +9,7 @@ import {
 } from "./realEstate";
 import { ENV } from "./_core/env";
 import { fetchMolitRentTrades, MOLIT_APT_RENT_ENDPOINT } from "./jeonse";
+import { appRouter } from "./routers";
 
 const hasMolitKey = Boolean(process.env.MOLIT_SERVICE_KEY);
 
@@ -220,5 +221,73 @@ describe("fetchRecentAptTrades tradeType wiring", () => {
     expect(jeonse.data[0]?.priceMan).toBe(30000);
     expect(callsAfterSale).toBeGreaterThan(0);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(0);
+  });
+});
+
+describe("realEstate.recentTrades router tradeType validation", () => {
+  let originalKey: string;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    originalKey = ENV.molitServiceKey;
+    ENV.molitServiceKey = "test-key";
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    ENV.molitServiceKey = originalKey;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("rejects an invalid tradeType at the router schema before any upstream call", async () => {
+    const caller = appRouter.createCaller({});
+    await expect(
+      caller.realEstate.recentTrades({ tradeType: "monthly" as "sale" }),
+    ).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("omitting tradeType defaults to sale and calls only the sale endpoint", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        salePayload([
+          { aptNm: "매매아파트", umdNm: "삼성동", jibun: "1", dealYear: "2026", dealMonth: "9", dealDay: "30", excluUseAr: "84.9", dealAmount: "150,000" },
+        ]),
+      ),
+    );
+
+    const caller = appRouter.createCaller({});
+    const result = await caller.realEstate.recentTrades({ region: "seoul", months: 1, propertyType: "apartment" });
+
+    expect(result.tradeType).toBe("sale");
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((url) => url.includes("getRTMSDataSvcAptTrade"))).toBe(true);
+    expect(urls.some((url) => /Rent/i.test(url))).toBe(false);
+    expect(result.data[0]).toMatchObject({ apartmentName: "매매아파트", priceMan: 150000 });
+  });
+
+  it("passes tradeType:'jeonse' through to the rent path and maps deposit to priceMan", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        rentPayload([
+          { aptNm: "전세아파트", umdNm: "삼성동", jibun: "5", dealYear: "2026", dealMonth: "9", dealDay: "15", excluUseAr: "59.9", deposit: "42,000", monthlyRent: "0" },
+          { aptNm: "월세아파트", umdNm: "삼성동", jibun: "6", dealYear: "2026", dealMonth: "9", dealDay: "16", excluUseAr: "59.9", deposit: "1,000", monthlyRent: "60" },
+        ]),
+      ),
+    );
+
+    const caller = appRouter.createCaller({});
+    const result = await caller.realEstate.recentTrades({ region: "seoul", months: 1, propertyType: "apartment", tradeType: "jeonse" });
+
+    expect(result.tradeType).toBe("jeonse");
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((url) => url.includes(MOLIT_APT_RENT_ENDPOINT))).toBe(true);
+    expect(urls.some((url) => url.includes("getRTMSDataSvcAptTrade"))).toBe(false);
+    expect(result.data.some((trade) => trade.apartmentName === "전세아파트" && trade.priceMan === 42000)).toBe(true);
+    expect(result.data.some((trade) => trade.apartmentName === "월세아파트")).toBe(false);
   });
 });
