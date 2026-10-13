@@ -10,7 +10,7 @@ import {
   formatWon,
   interpret,
 } from "@/lib/interpretation";
-import { budgetAssumptionNote, computeExplorationBudget, loanMetricDetail } from "@/lib/explorationBudget";
+import { budgetAssumptionNote, computeExplorationBudget, loanMetricDetail, showsLoanTerm } from "@/lib/explorationBudget";
 import {
   SCALE_CRITERION_LABEL,
   SCALE_MODE_LABEL,
@@ -826,7 +826,9 @@ export default function Home() {
               <div className="budget-fields-grid">
                 <BudgetField label="보유 자금" value={savings} unit="만원" onChange={setSavings} />
                 <BudgetField label="월 상환 가능액" value={monthly} unit="만원" onChange={setMonthly} />
-                <BudgetField label="대출 기간" value={years} unit="년" onChange={setYears} min={5} step={5} />
+                {showsLoanTerm(tradeType) && (
+                  <BudgetField label="대출 기간" value={years} unit="년" onChange={setYears} min={5} step={5} />
+                )}
                 <BudgetField label="예상 금리" value={rate} unit="%" onChange={setRate} min={0} step={0.1} />
               </div>
               <div className="budget-slider-row">

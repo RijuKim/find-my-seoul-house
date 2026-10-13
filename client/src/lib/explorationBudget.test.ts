@@ -5,6 +5,7 @@ import {
   jeonseLoanByInterest,
   loanMetricDetail,
   saleLoanByPayment,
+  showsLoanTerm,
 } from "./explorationBudget";
 
 describe("saleLoanByPayment", () => {
@@ -106,5 +107,15 @@ describe("loanMetricDetail", () => {
     expect(detail).not.toContain("년");
     expect(detail).not.toContain("가정");
     expect(detail).toContain("이자만");
+  });
+});
+
+describe("showsLoanTerm", () => {
+  it("shows the loan-term input in sale mode (byte-identical to prior behavior)", () => {
+    expect(showsLoanTerm("sale")).toBe(true);
+  });
+
+  it("hides the loan-term input in jeonse mode (interest-only ignores the term)", () => {
+    expect(showsLoanTerm("jeonse")).toBe(false);
   });
 });

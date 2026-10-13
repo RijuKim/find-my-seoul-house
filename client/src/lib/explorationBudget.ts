@@ -65,6 +65,15 @@ export function budgetAssumptionNote(tradeType: ExplorationTradeType, ratePct: n
 }
 
 /**
+ * 예산 패널의 "대출 기간" 입력 노출 여부.
+ * 전세는 이자만 상환 구조라 대출 기간이 예산 계산에 쓰이지 않으므로 입력을 숨긴다.
+ * 매매는 기존 화면과 byte-identical 하게 유지한다(항상 노출).
+ */
+export function showsLoanTerm(tradeType: ExplorationTradeType): boolean {
+  return tradeType !== "jeonse";
+}
+
+/**
  * "예상 대출 가능액" 지표의 상세 문구.
  * 매매는 금리 + 대출 기간, 전세는 이자만 상환 구조라 기간 지표를 넣지 않는다.
  * 매매 문구는 기존 화면과 byte-identical 하게 유지한다.
