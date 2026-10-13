@@ -10,7 +10,7 @@ import {
   formatWon,
   interpret,
 } from "@/lib/interpretation";
-import { computeExplorationBudget } from "@/lib/explorationBudget";
+import { budgetAssumptionNote, computeExplorationBudget, loanMetricDetail } from "@/lib/explorationBudget";
 import {
   SCALE_CRITERION_LABEL,
   SCALE_MODE_LABEL,
@@ -834,7 +834,7 @@ export default function Home() {
                 <input type="range" min={40} max={80} step={5} value={ltv} onChange={(event) => setLtv(Number(event.target.value))} aria-label="LTV 가정" />
                 <div className="slider-meta"><span>보수적 40%</span><span>일반적 80%</span></div>
               </div>
-              <div className="assumption-note"><Zap size={14} /><span>월 상환액을 기준으로 원리금균등상환, 금리 {rate}%를 가정했어요.</span></div>
+              <div className="assumption-note"><Zap size={14} /><span>{budgetAssumptionNote(tradeType, rate)}</span></div>
             </div>
             <div className="budget-result-panel">
               <div className="result-topline"><span>탐색 예산 상한</span><span className="result-status"><span className="live-dot" /> CALCULATED</span></div>
@@ -847,7 +847,7 @@ export default function Home() {
           </div>
           <div className="metrics-row">
             <Metric label="내가 준비한 자금" value={formatPrice(savings)} detail="취득·이사비 미반영" />
-            <Metric label="예상 대출 가능액" value={formatPrice(budget.loan)} detail={`금리 ${rate}% · ${years}년 가정`} />
+            <Metric label="예상 대출 가능액" value={formatPrice(budget.loan)} detail={loanMetricDetail(tradeType, rate, years)} />
             <Metric label="탐색 예산 상한" value={formatPrice(budget.total)} detail={`LTV ${ltv}% 가정 · 실제 심사와 다름`} />
             <div className="metrics-callout"><TrendingUp size={18} /><span>예산을 바꾸면<br /><strong>조회 결과도 바로 바뀌어요.</strong></span></div>
           </div>

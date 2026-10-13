@@ -1,9 +1,15 @@
 # Job Queue
 
-Updated: 2026-10-12T04:02:44.278Z
+Updated: 2026-10-13T00:00:44.678Z
 
+- [ ] jeonse-final-verify (e2e-1)
 - [!] Implement honest housing type and scale filters (housing-filters-implementation) — 7s !! opencode exited with code 1
 - [x] Verify housing filters across API and mobile desktop UI (housing-filters-integration) — 2m 38s
+- [x] jeonse-server-module (job-1) — 32s
+- [x] jeonse-server-tradetype (job-2) — 1m 9s
+- [x] jeonse-interpretation (job-3) — 1m 5s
+- [~] jeonse-ui-toggle (job-4) — 6ms
+- [ ] jeonse-browser-acceptance (job-5)
 - [x] eval-mtw8z58y — 9s
 - [x] eval-mtw9ze1o — 13s
 - [x] eval-mtwa0rfz — 28s
@@ -19,3 +25,33 @@ Updated: 2026-10-12T04:02:44.278Z
 - [x] eval-mv4mgoaw — 9s
 - [x] eval-mv4miecl — 8s
 - [x] eval-mv4q7c4h — 24s
+- [x] code_critic for e2e8cbe2 — 1m 1s
+- [x] test_critic for e2e8cbe2 — 54s
+- [x] interaction_e2e for e2e8cbe2 — 39s
+- [x] jeonse_classification_critic for e2e8cbe2 — 38s
+- [x] jeonse_budget_critic for e2e8cbe2 — 15s
+- [x] code_critic for e2e8cbe2 — 24s
+- [x] test_critic for e2e8cbe2 — 19s
+- [x] interaction_e2e for e2e8cbe2 — 41s
+- [x] jeonse_classification_critic for e2e8cbe2 — 26s
+- [x] jeonse_budget_critic for e2e8cbe2 — 20s
+- [x] code_critic for bda646dc — 1m 23s
+- [x] test_critic for bda646dc — 48s
+- [x] interaction_e2e for bda646dc — 2m 8s
+- [x] jeonse_classification_critic for bda646dc — 34s
+- [x] jeonse_budget_critic for bda646dc — 19s
+- [x] code_critic for bda646dc — 46s
+- [x] test_critic for bda646dc — 46s
+- [x] interaction_e2e for bda646dc — 1m 7s
+- [x] jeonse_classification_critic for bda646dc — 1m 10s
+- [x] jeonse_budget_critic for bda646dc — 26s
+- [x] code_critic for a7d906e4 — 1m 8s
+- [x] test_critic for a7d906e4 — 47s
+- [x] interaction_e2e for a7d906e4 — 41s
+- [x] jeonse_classification_critic for a7d906e4 — 36s
+- [x] jeonse_budget_critic for a7d906e4 — 36s
+- [x] code_critic for cb7a4be7 — 2m 49s
+- [x] test_critic for cb7a4be7 — 1m 13s
+- [x] interaction_e2e for cb7a4be7 — 5m 26s
+- [x] jeonse_classification_critic for cb7a4be7 — 1m 10s
+- [x] jeonse_budget_critic for cb7a4be7 — 59s

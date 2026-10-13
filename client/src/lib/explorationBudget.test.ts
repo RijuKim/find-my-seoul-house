@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  budgetAssumptionNote,
   computeExplorationBudget,
   jeonseLoanByInterest,
+  loanMetricDetail,
   saleLoanByPayment,
 } from "./explorationBudget";
 
@@ -76,5 +78,33 @@ describe("computeExplorationBudget", () => {
     // 70% LTV: 24,000 / 0.3 ≈ 80,000 (floating point floors to 79,500).
     expect(budget.total).toBe(79_500);
     expect(budget.total).toBeLessThanOrEqual(budget.ltvCapPrice);
+  });
+});
+
+describe("budgetAssumptionNote", () => {
+  it("keeps the sale copy byte-identical (amortization + rate)", () => {
+    expect(budgetAssumptionNote("sale", 4.2)).toBe("월 상환액을 기준으로 원리금균등상환, 금리 4.2%를 가정했어요.");
+  });
+
+  it("states interest-only for jeonse and drops the amortization wording", () => {
+    const note = budgetAssumptionNote("jeonse", 4.2);
+    expect(note).toBe("월 이자 상한을 기준으로 이자만 상환, 금리 4.2%를 가정했어요.");
+    expect(note).toContain("이자만");
+    expect(note).not.toContain("원리금균등상환");
+    expect(note).toContain("4.2%");
+  });
+});
+
+describe("loanMetricDetail", () => {
+  it("keeps the sale copy byte-identical (rate + term)", () => {
+    expect(loanMetricDetail("sale", 4.2, 30)).toBe("금리 4.2% · 30년 가정");
+  });
+
+  it("omits the term-bearing metric for jeonse and shows interest-only", () => {
+    const detail = loanMetricDetail("jeonse", 4.2, 30);
+    expect(detail).toBe("금리 4.2% · 이자만 상환");
+    expect(detail).not.toContain("년");
+    expect(detail).not.toContain("가정");
+    expect(detail).toContain("이자만");
   });
 });

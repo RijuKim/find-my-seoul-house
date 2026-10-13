@@ -52,3 +52,26 @@ export function computeExplorationBudget(inputs: ExplorationBudgetInputs): Explo
   const total = Math.max(0, Math.floor(Math.min(savingsMan + repaymentLoan, ltvCapPrice) / 500) * 500);
   return { total, loan: Math.max(0, total - savingsMan), repaymentLoan, ltvCapPrice };
 }
+
+/**
+ * 예산 패널 가정 문구. 매매는 원리금균등상환, 전세는 이자만 상환.
+ * 매매 문구는 기존 화면과 byte-identical 하게 유지한다.
+ */
+export function budgetAssumptionNote(tradeType: ExplorationTradeType, ratePct: number): string {
+  if (tradeType === "jeonse") {
+    return `월 이자 상한을 기준으로 이자만 상환, 금리 ${ratePct}%를 가정했어요.`;
+  }
+  return `월 상환액을 기준으로 원리금균등상환, 금리 ${ratePct}%를 가정했어요.`;
+}
+
+/**
+ * "예상 대출 가능액" 지표의 상세 문구.
+ * 매매는 금리 + 대출 기간, 전세는 이자만 상환 구조라 기간 지표를 넣지 않는다.
+ * 매매 문구는 기존 화면과 byte-identical 하게 유지한다.
+ */
+export function loanMetricDetail(tradeType: ExplorationTradeType, ratePct: number, years: number): string {
+  if (tradeType === "jeonse") {
+    return `금리 ${ratePct}% · 이자만 상환`;
+  }
+  return `금리 ${ratePct}% · ${years}년 가정`;
+}
