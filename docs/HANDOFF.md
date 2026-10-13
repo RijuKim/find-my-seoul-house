@@ -51,7 +51,7 @@ server/
 api-src/trpc.ts    Vercel 서버리스 함수 소스 (fetchRequestHandler)
 scripts/build-api.mjs  api-src를 api/trpc/[...trpc].js로 esbuild 번들
 scripts/audit-scale-coverage.ts  읽기 전용 K-apt 정밀 매처 실측 감사
-api/               빌드 산출물 (gitignore)
+api/               Vercel 함수 번들 (커밋됨 — 아래 5절 함정 2 참고)
 vercel.json        Vercel 설정
 render.yaml        Render 대안 설정
 docs/              DEPLOYMENT, data-sources, kapt-integration, HANDOFF
@@ -139,6 +139,7 @@ vercel deploy --prod --yes
    ```
 2. Vercel 기본 api 번들러가 `server/*` 상대 import를 해석 못 함 → `scripts/build-api.mjs`로 esbuild 자체 번들 (이미 적용됨). `vercel.json` buildCommand에 포함.
 3. Deployment Protection(Vercel Authentication)이 켜져 있으면 외부 접근 401 → 프로젝트 설정에서 해제됨(`ssoProtection: null`).
+4. **`api/`는 반드시 커밋해야 한다(gitignore 금지).** `vercel.json`의 `functions: {"api/trpc/[...trpc].js": ...}` 패턴을 Vercel이 **빌드 시작 시점**에 검증하므로, 파일이 저장소에 없으면 `The pattern "api/trpc/[...trpc].js" ... doesn't match any Serverless Functions` 오류로 2초 만에 실패한다. 빌드가 재생성하므로 소스 변경 후 로컬에서 `node scripts/build-api.mjs`를 돌려 api 번들을 커밋하면 된다.
 
 ### Render (대안, 미사용)
 `render.yaml` 참고. 무료 플랜은 15분 유휴 후 spin-down(첫 요청 ~1분), 외부 API 호출이 많은 서비스는 정지될 수 있음.
@@ -197,5 +198,5 @@ http://localhost:3000
 
 - 키/시크릿은 커밋 금지. `.env`는 gitignore. `git grep`으로 유출 점검.
 - shadcn/ui 컴포넌트(`client/src/components/ui/`)는 CLI로만 수정 (`npx shadcn@latest add`).
-- `api/`, `dist/`는 빌드 산출물이라 gitignore. 소스는 `api-src/`, `scripts/`.
+- `dist/`는 gitignore. `api/`(Vercel 함수 번들)는 **커밋한다** — 배포 시 `functions` 패턴이 파일 존재를 요구한다(5절 함정 4). 소스는 `api-src/`, `scripts/`.
 - 커밋 이력: 초기 Manus 이식 → 정직성 정리(A) → 죽은 코드 청소(B) → 해석 레이어(C) → 카카오 통일 → Vercel 배포/번들.
