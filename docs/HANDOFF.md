@@ -16,6 +16,7 @@
 - **2026-10-10 재검증 (housing-filters 통합 검증, Tenet 최종 PASS)**: `pnpm check` clean, `pnpm test` 70 passed / 8 skipped, `pnpm build` + `build-api.mjs` pass. 브라우저 수용 스크립트(`tests/acceptance/housing-filters.cjs`) 전부 통과 at 1280·360, 콘솔 에러 0; 라이브 기본 조회 108건 + 지도 108개 마커, 규모 API 호출 0; 라이브 규모 조회 102개 고유 단지를 9회(≤12/회) 배치로 해석, K-apt 상류 429는 `unavailable`+재시도로 안전 처리.
 - **2026-10-10 터치 타깃 수정 (commit a9c9dc1)**: 통합 검증에서 발견된 44px 최소 터치 타깃 미달(칩 32→44, 규모 select 36→44, 재시도/초기화 32→44) 수정, `ScaleResult.checkedAt`을 "확인 시각: … 기준."으로 규모 출처 옆에 표시. 수용 스크립트에 44px·확인시각 단언 추가.
 - **2026-10-12 전세 거래 유형 추가 (Tenet run `2026-10-12-jeonse`)**: 상단 거래 유형 토글(매매 | 전세), 국토부 전월세 실거래(보증금) 기반 전세 탐색. 서버 `server/jeonse.ts`(순수 판정·파싱) + `recentTrades.tradeType`, 클라이언트 `Home.tsx` 토글·이자만 탐색 예산·전세 고지. 상세는 2.2절.
+- **2026-10-13 현재 테스트 수치**: `pnpm check` clean, `pnpm test` **121 passed / 8 skipped** (7 test files passed / 5 skipped; 자격증명 필요 파일은 키 미설정으로 skip). 전세 추가로 늘어난 수치는 `jeonse.acceptance.test.ts` 21개, `explorationBudget.test.ts` 14개, `interpretation.test.ts` 34개다. (2026-10-10 housing-filters 재검증의 70 passed는 해당 실행 시점 기준 수치다.)
 
 ### 검증된 동작 (프로덕션)
 | 기능 | 상태 |
@@ -165,7 +166,7 @@ http://localhost:3000
 - **빈 결과·오류·미지 필드를 정직하게** 표시. 샘플로 조용히 대체 금지.
 - 비교 시 기준 레코드를 이름으로 명시, 부족 필드는 비교에서 제외.
 
-해석 로직: `client/src/lib/interpretation.ts` (+ `interpretation.test.ts` 27개).
+해석 로직: `client/src/lib/interpretation.ts` (+ `interpretation.test.ts` 34개).
 
 ---
 

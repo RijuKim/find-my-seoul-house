@@ -1,0 +1,2 @@
+# Verification screenshots are binary evidence artifacts; never commit them.
+*.png
