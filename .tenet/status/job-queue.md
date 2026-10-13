@@ -1,6 +1,6 @@
 # Job Queue
 
-Updated: 2026-10-13T01:03:22.504Z
+Updated: 2026-10-13T05:31:08.715Z
 
 - [x] jeonse-final-verify (e2e-1) — 1m 54s
 - [!] Implement honest housing type and scale filters (housing-filters-implementation) — 7s !! opencode exited with code 1
@@ -86,3 +86,7 @@ Updated: 2026-10-13T01:03:22.504Z
 - [x] interaction_e2e for 1621d911 — 3m 39s
 - [x] jeonse_classification_critic for 1621d911 — 1m 16s
 - [x] jeonse_budget_critic for 1621d911 — 15s
+- [x] doctrine-maintenance: sync project docs to reality — 20s
+- [x] code_critic for 06b081b9 — 57s
+- [x] test_critic for 06b081b9 — 22s
+- [x] interaction_e2e for 06b081b9 — 31s
