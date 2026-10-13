@@ -129,3 +129,5 @@ api/
 
 # Verification screenshots
 prod-home.png
+e2e-*.png
+*.png.tmp-*

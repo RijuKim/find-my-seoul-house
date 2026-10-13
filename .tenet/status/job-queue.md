@@ -1,15 +1,15 @@
 # Job Queue
 
-Updated: 2026-10-13T00:00:44.678Z
+Updated: 2026-10-13T01:03:22.504Z
 
-- [ ] jeonse-final-verify (e2e-1)
+- [x] jeonse-final-verify (e2e-1) — 1m 54s
 - [!] Implement honest housing type and scale filters (housing-filters-implementation) — 7s !! opencode exited with code 1
 - [x] Verify housing filters across API and mobile desktop UI (housing-filters-integration) — 2m 38s
 - [x] jeonse-server-module (job-1) — 32s
 - [x] jeonse-server-tradetype (job-2) — 1m 9s
 - [x] jeonse-interpretation (job-3) — 1m 5s
-- [~] jeonse-ui-toggle (job-4) — 6ms
-- [ ] jeonse-browser-acceptance (job-5)
+- [x] jeonse-ui-toggle (job-4) — 1m 25s
+- [x] jeonse-browser-acceptance (job-5) — 3m 21s
 - [x] eval-mtw8z58y — 9s
 - [x] eval-mtw9ze1o — 13s
 - [x] eval-mtwa0rfz — 28s
@@ -55,3 +55,34 @@ Updated: 2026-10-13T00:00:44.678Z
 - [x] interaction_e2e for cb7a4be7 — 5m 26s
 - [x] jeonse_classification_critic for cb7a4be7 — 1m 10s
 - [x] jeonse_budget_critic for cb7a4be7 — 59s
+- [x] code_critic for cb7a4be7 — 1m 6s
+- [x] test_critic for cb7a4be7 — 34s
+- [x] interaction_e2e for cb7a4be7 — 2m 4s
+- [x] jeonse_classification_critic for cb7a4be7 — 43s
+- [x] jeonse_budget_critic for cb7a4be7 — 1m 18s
+- [x] code_critic for cb7a4be7 — 55s
+- [x] test_critic for cb7a4be7 — 1m 16s
+- [x] interaction_e2e for cb7a4be7 — 2m 8s
+- [x] jeonse_classification_critic for cb7a4be7 — 32s
+- [x] jeonse_budget_critic for cb7a4be7 — 48s
+- [x] code_critic for adffac56 — 1m 8s
+- [x] test_critic for adffac56 — 1m 2s
+- [x] interaction_e2e for adffac56 — 2m 8s
+- [x] jeonse_classification_critic for adffac56 — 1m 29s
+- [x] jeonse_budget_critic for adffac56 — 1m 30s
+- [x] code_critic for 1621d911 — 4m 15s
+- [x] test_critic for 1621d911 — 2m 18s
+- [x] interaction_e2e for 1621d911 — 4m 35s
+- [x] jeonse_classification_critic for 1621d911 — 1m 36s
+- [x] jeonse_budget_critic for 1621d911 — 1m 52s
+- [x] fix-handoff-doc-accuracy — 1m 1s
+- [x] code_critic for 67e27767 — 1m 7s
+- [x] test_critic for 67e27767 — 28s
+- [x] interaction_e2e for 67e27767 — 53s
+- [x] jeonse_classification_critic for 67e27767 — 36s
+- [x] jeonse_budget_critic for 67e27767 — 24s
+- [x] code_critic for 1621d911 — 1m 18s
+- [x] test_critic for 1621d911 — 1m 38s
+- [x] interaction_e2e for 1621d911 — 3m 39s
+- [x] jeonse_classification_critic for 1621d911 — 1m 16s
+- [x] jeonse_budget_critic for 1621d911 — 15s

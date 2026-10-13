@@ -1,18 +1,14 @@
 # Tenet Status
 
-Updated: 2026-10-13T00:00:44.678Z
+Updated: 2026-10-13T01:03:22.504Z
 
 | Metric | Count |
 |--------|-------|
-| Completed | 49 / 53 |
-| Running | 1 |
-| Pending | 2 |
+| Completed | 83 / 84 |
+| Running | 0 |
+| Pending | 0 |
 | Failed | 1 |
 | Blocked | 0 |
-
-## Currently Running
-
-- [~] jeonse-ui-toggle (job-4) — 5ms
 
 ## Failed
 
